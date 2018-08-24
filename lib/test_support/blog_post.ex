@@ -6,6 +6,7 @@ defmodule AbacusSqlTest.BlogPost do
     field :body, :string
 
     belongs_to :author, AbacusSqlTest.User
+    has_many :comments, AbacusSqlTest.Comment
 
     timestamps()
   end

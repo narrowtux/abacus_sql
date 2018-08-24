@@ -50,4 +50,58 @@ defmodule AbacusSqlTest do
 
     assert inspect(expected_query) == inspect(query)
   end
+
+  test "auto-join 2 deep" do
+    expected_query =
+      from b in BlogPost,
+        left_join: c in assoc(b, :comments),
+        left_join: a in assoc(c, :author),
+        where: a.name == ^"Moritz Schmale"
+
+    query =
+      from(b in BlogPost)
+      |> AbacusSql.where(~S[comments.author.name == "Moritz Schmale"])
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
+  test "auto-join 3 deep" do
+    expected_query =
+      from b in BlogPost,
+        left_join: c in assoc(b, :comments),
+        left_join: a in assoc(c, :author),
+        left_join: bb in assoc(a, :blog_posts),
+        where: bb.title == ^"abacus"
+
+    query =
+      from(b in BlogPost)
+      |> AbacusSql.where(~S[comments.author.blog_posts.title == "abacus"])
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
+  test "order by" do
+    expected_query =
+      from b in BlogPost,
+        left_join: a in assoc(b, :author),
+        order_by: a.name
+
+    query =
+      from(b in BlogPost)
+      |> AbacusSql.order_by("author.name")
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
+  test "group by" do
+    expected_query =
+      from b in BlogPost,
+        group_by: b.author_id
+
+    query =
+      from(b in BlogPost)
+      |> AbacusSql.group_by("author_id")
+
+    assert inspect(expected_query) == inspect(query)
+  end
 end

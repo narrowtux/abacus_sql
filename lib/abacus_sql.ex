@@ -41,17 +41,31 @@ defmodule AbacusSql do
     |> Map.update!(:wheres, &[where | &1])
   end
 
-  # @spec order_by(Ecto.Query.t, t, boolean) :: Ecto.Query.t
-  # def order_by(query, term, ascending? \\ true) do
-  #   {:ok, query, expr, params} = Term.to_ecto_term(query, term)
+  @spec order_by(Ecto.Query.t, t, boolean) :: Ecto.Query.t
+  def order_by(query, term, ascending? \\ true) do
+    {:ok, query, expr, params} = Term.to_ecto_term(query, term)
 
-  #   query
-  # end
+    direction = if ascending?, do: :asc, else: :desc
 
-  # @spec group_by(Ecto.Query.t, t) :: Ecto.Query.t
-  # def group_by(query, term) do
-  #   {:ok, query, expr, params} = Term.to_ecto_term(query, term)
+    Map.update!(query, :order_bys, fn order_bys ->
+      order_by = %Ecto.Query.QueryExpr{
+        expr: [{direction, expr}],
+        params: params
+      }
+      order_bys ++ [order_by]
+    end)
+  end
 
-  #   query
-  # end
+  @spec group_by(Ecto.Query.t, t) :: Ecto.Query.t
+  def group_by(query, term) do
+    {:ok, query, expr, params} = Term.to_ecto_term(query, term)
+
+    Map.update!(query, :group_bys, fn group_bys ->
+      group_by = %Ecto.Query.QueryExpr{
+        expr: [expr],
+        params: params
+      }
+      group_bys ++ [group_by]
+    end)
+  end
 end

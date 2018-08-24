@@ -5,5 +5,6 @@ defmodule AbacusSqlTest.User do
     field :name, :string
 
     has_many :blog_posts, AbacusSqlTest.BlogPost, foreign_key: :author_id
+    has_many :comments, AbacusSqlTest.Comment, foreign_key: :author_id
   end
 end

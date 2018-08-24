@@ -5,16 +5,33 @@ defmodule AbacusSql.Term do
   def to_ecto_term(query, term, params \\ []) do
     {:ok, ast} = parse(term)
 
-    {term_expr, query, params} = convert_ast(ast, query, params, get_root(query))
+    {term_expr, query, params} = convert_ast(ast, query, Enum.reverse(params), 0)
 
     {:ok, query, term_expr, Enum.reverse(params)}
   end
 
-  @spec convert_ast(any, Ecto.Query.t, list, module) :: {any, Ecto.Query.t, list}
+  @spec convert_ast(any, Ecto.Query.t, list, integer) :: {any, Ecto.Query.t, list}
   def convert_ast(ast, query, params, root)
   def convert_ast({binary, _, nil}, query, params, root) when is_binary(binary) do
     {term, query, params, _root} = get_field(binary, query, params, root)
     {term, query, params}
+  end
+
+  def convert_ast({ops, ctx, [l, r]}, query, params, root) when ops in ~w[== !=]a and (is_nil(r) or is_nil(l)) do
+    fragment = case ops do
+      :== -> " IS NULL"
+      :!= -> " IS NOT NULL"
+    end
+    {literal, query, params} = case {l, r} do
+      {nil, lit} -> convert_ast(lit, query, params, root)
+      {lit, nil} -> convert_ast(lit, query, params, root)
+    end
+    expr = {:fragment, ctx, [
+      raw: "",
+      expr: literal,
+      raw: fragment
+    ]}
+    {expr, query, params}
   end
 
   def convert_ast({:., _, [from, {:variable, field}]}, query, params, root) do
@@ -34,8 +51,8 @@ defmodule AbacusSql.Term do
     {term, query, params}
   end
 
-  @ops ~w[== >= <= < > !=]a
-  def convert_ast({ops, ctx, args}, query, params, root) when ops in @ops do
+  @compare_ops ~w[== >= <= < > !=]a
+  def convert_ast({ops, ctx, args}, query, params, root) when ops in @compare_ops do
     {args, query, params} = reduce_args(args, query, params, root)
     term = {ops, ctx, args}
     {term, query, params}
@@ -51,13 +68,18 @@ defmodule AbacusSql.Term do
   end
 
   def get_field(path, query, params, root)
+  def get_field({:variable, name}, query, params, root) do
+    get_field(name, query, params, root)
+  end
+  def get_field({:., _, [lhs, rhs]}, query, params, root) do
+    {_, query, params, root} = get_field(lhs, query, params, root)
+    get_field(rhs, query, params, root)
+  end
   def get_field({field, _, nil}, query, params, root) when is_binary(field) do
     get_field(field, query, params, root)
   end
-  def get_field(field, query, params, root) when is_binary(field) do
-    root = root || get_root(query)
-    root_id = get_table_id(query, root)
-
+  def get_field(field, query, params, root_id) when is_binary(field) do
+    root = get_schema_by_id(query, root_id)
     {query, term, root} = case {find_field(root, field), find_assoc(root, field)} do
       {nil, nil} ->
         raise "could neither find #{field} as a field nor an association of #{root}"
@@ -65,7 +87,7 @@ defmodule AbacusSql.Term do
         {query, {{:., [], [{:&, [], [root_id]}, field]}, [], []}, root}
       {nil, assoc} when is_atom(assoc)->
         {query, tid} = auto_join(query, root_id, assoc)
-        {query, nil, get_schema_by_id(query, tid)}
+        {query, nil, tid}
     end
 
     {term, query, params, root}
