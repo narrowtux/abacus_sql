@@ -1,6 +1,21 @@
 # AbacusSql
 
-**TODO: Add description**
+This library combines abacus and ecto. 
+
+Pipe user-supplied abacus terms into queries like this:
+
+```elixir
+from(b in BlogPost) 
+|> AbacusSql.where(~S[title == "abacus"])
+|> AbacusSql.select("author", "author.name")
+```
+
+and you'll get a query that will not only filter for the posts title, but also automatically joins to the users table, adding the name of the author to the select list:
+
+```
+#Ecto.Query<from b in AbacusSqlTest.BlogPost, left_join: a in assoc(b, :author),
+ where: b.title == ^"abacus", select: %{"author" => a.name}>
+```
 
 ## Installation
 
