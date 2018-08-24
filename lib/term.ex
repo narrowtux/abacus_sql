@@ -59,13 +59,13 @@ defmodule AbacusSql.Term do
     root_id = get_table_id(query, root)
 
     {query, term, root} = case {find_field(root, field), find_assoc(root, field)} do
-      {{field, _type}, nil} ->
-        {query, {{:., [], [{:&, [], [root_id]}, field]}, [], []}, root}
-      {nil, assoc} when is_atom(assoc) ->
-        {query, tid} = auto_join(query, root_id, assoc)
-        {query, nil, get_schema_by_id(query, tid)}
       {nil, nil} ->
         raise "could neither find #{field} as a field nor an association of #{root}"
+      {{field, _type}, nil} ->
+        {query, {{:., [], [{:&, [], [root_id]}, field]}, [], []}, root}
+      {nil, assoc} when is_atom(assoc)->
+        {query, tid} = auto_join(query, root_id, assoc)
+        {query, nil, get_schema_by_id(query, tid)}
     end
 
     {term, query, params, root}
@@ -80,9 +80,17 @@ defmodule AbacusSql.Term do
       ix: nil,
       source: nil
     }
-    tid = length(query.joins) + 1
-    query = Map.update!(query, :joins, &(&1 ++ [join]))
-    {query, tid}
+    case Enum.find_index(query.joins, fn
+      %{assoc: {^origin_id, ^assoc}, qual: :left} -> true
+      _ -> false
+    end) do
+      nil ->
+        tid = length(query.joins) + 1
+        query = Map.update!(query, :joins, &(&1 ++ [join]))
+        {query, tid}
+      tid when is_integer(tid) ->
+        {query, tid + 1}
+    end
   end
 
   @spec find_field(atom, binary) :: {field :: atom, type :: atom} | nil

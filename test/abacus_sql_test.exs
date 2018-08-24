@@ -28,6 +28,18 @@ defmodule AbacusSqlTest do
     assert inspect(expected_query) == inspect(query)
   end
 
+  test "no duplicate joins" do
+    origin_query = from q in BlogPost,
+      left_join: a in assoc(q, :author)
+
+    expected_query = from [b, a] in origin_query,
+      where: a.name == ^"Blabla"
+
+    query = AbacusSql.where(origin_query, ~S[author.name == "Blabla"])
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
   test "custom select" do
     expected_query = from q in BlogPost,
       select: %{"custom" => q.title}
