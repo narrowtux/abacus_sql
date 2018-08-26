@@ -34,6 +34,34 @@ defmodule AbacusSql.Term do
     {expr, query, params}
   end
 
+  @allowed_fn_calls ~w[
+    sum count avg min max
+    date_trunc now
+  ]a
+  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when is_binary(fn_call) do
+    {args, query, params} = reduce_args(args, query, params, root)
+    case binary_to_allowed_atom(fn_call, @allowed_fn_calls) do
+      nil ->
+        raise "Function call #{fn_call} is not allowed"
+      o ->
+       term = {o, ctx, args}
+       {term, query, params}
+    end
+  end
+
+  @binary_ops ~w[+ - * /]a
+  def convert_ast({ops, ctx, args}, query, params, root) when ops in @binary_ops do
+    {[lhs, rhs], query, params} = reduce_args(args, query, params, root)
+    term = {:fragment, ctx, [
+      raw: "",
+      expr: lhs,
+      raw: to_string(ops),
+      expr: rhs,
+      raw: ""
+    ]}
+    {term, query, params}
+  end
+
   def convert_ast({:., _, [from, {:variable, field}]}, query, params, root) do
     {_, query, params, root} = get_field(from, query, params, root)
     convert_ast({field, [], nil}, query, params, root)
@@ -41,12 +69,7 @@ defmodule AbacusSql.Term do
 
   def convert_ast(primitive, query, params, _root) when is_primitive(primitive) do
     term = {:^, [], [length(params)]}
-    type = case primitive do
-      t when is_binary(t) -> :string
-      t when is_integer(t) -> :integer
-      t when is_float(t) -> :float
-      t when is_boolean(t) -> :boolean
-    end
+    type = typeof(primitive)
     params = [{primitive, type} | params]
     {term, query, params}
   end
@@ -67,6 +90,11 @@ defmodule AbacusSql.Term do
     {terms, query, params}
   end
 
+  # (((author.blog_posts).meta_tags).description)
+  # join q.author a
+  # join a.blog_posts bb
+  # bb.meta_tags -> description
+
   def get_field(path, query, params, root)
   def get_field({:variable, name}, query, params, root) do
     get_field(name, query, params, root)
@@ -78,14 +106,26 @@ defmodule AbacusSql.Term do
   def get_field({field, _, nil}, query, params, root) when is_binary(field) do
     get_field(field, query, params, root)
   end
+  def get_field(field, query, params, {root_field, :map}) do
+    params = [{field, :string} | params]
+    term = {:fragment, [], [
+      raw: "",
+      expr: root_field,
+      raw: "->",
+      expr: {:^, [], [length(params) - 1]},
+      raw: ""
+    ]}
+    {term, query, params, {term, :map}}
+  end
   def get_field(field, query, params, root_id) when is_binary(field) do
     root = get_schema_by_id(query, root_id)
-    {query, term, root} = case {find_field(root, field), find_assoc(root, field)} do
-      {nil, nil} ->
+    {query, term, root} = case {root, find_field(root, field), find_assoc(root, field)} do
+      {_, nil, nil} ->
         raise "could neither find #{field} as a field nor an association of #{root}"
-      {{field, _type}, nil} ->
-        {query, {{:., [], [{:&, [], [root_id]}, field]}, [], []}, root}
-      {nil, assoc} when is_atom(assoc)->
+      {_, {field, type}, nil} ->
+        term = {{:., [], [{:&, [], [root_id]}, field]}, [], []}
+        {query, term, {term, type}}
+      {_, nil, assoc} when is_atom(assoc)->
         {query, tid} = auto_join(query, root_id, assoc)
         {query, nil, tid}
     end
@@ -171,6 +211,19 @@ defmodule AbacusSql.Term do
     end
   end
 
+  def binary_to_allowed_atom(binary, atoms) do
+    Enum.find(atoms, fn a -> to_string(a) == binary end)
+  end
+
+  def typeof(primitive) do
+    case primitive do
+      t when is_binary(t) -> :string
+      t when is_integer(t) -> :integer
+      t when is_float(t) -> :float
+      t when is_boolean(t) -> :boolean
+    end
+  end
+
   @spec parse(AbacusSql.t) :: {:ok, tuple}
   def parse(ast) when is_tuple(ast) do
     ast
@@ -188,6 +241,7 @@ defmodule AbacusSql.Term do
       {:ok, ast}
     end
   end
+
 
   @spec rename_variables(tuple, map) :: tuple
   defp rename_variables(ast, vars) do
