@@ -2,7 +2,7 @@ defmodule AbacusSql do
   alias AbacusSql.Term
   @type t :: binary | list | tuple
 
-  @spec select(Ecto.Query.t, atom, t) :: Ecto.Query.t
+  @spec select(Ecto.Query.t, atom | String.t, t) :: Ecto.Query.t
   def select(query, key, term) do
     params = case query.select do
       %{params: params} -> params
