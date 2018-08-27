@@ -93,6 +93,11 @@ defmodule AbacusSql.Term do
     {_, query, params, root} = get_field(from, query, params, root)
     convert_ast({field, [], nil}, query, params, root)
   end
+  def convert_ast({:., _, [from, expr]}, query, params, root) do
+    {_, query, params, root} = get_field(from, query, params, root)
+    {expr, query, params, _root} = get_field(expr, query, params, root)
+    {expr, query, params}
+  end
 
   def convert_ast(primitive, query, params, _root) when is_primitive(primitive) do
     term = {:^, [], [length(params)]}
@@ -134,12 +139,12 @@ defmodule AbacusSql.Term do
     get_field(field, query, params, root)
   end
   def get_field(field, query, params, {root_field, :map}) do
-    params = [{field, :string} | params]
+    {field, query, params} = convert_ast(field, query, params, 0)
     term = {:fragment, [], [
       raw: "",
       expr: root_field,
       raw: "->",
-      expr: {:^, [], [length(params) - 1]},
+      expr: field,
       raw: ""
     ]}
     {term, query, params, {term, :map}}
