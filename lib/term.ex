@@ -36,7 +36,7 @@ defmodule AbacusSql.Term do
 
   @allowed_fn_calls ~w[
     sum count avg min max
-    date_trunc now
+    date_trunc now interval
   ]a
   def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when is_binary(fn_call) do
     {args, query, params} = reduce_args(args, query, params, root)
