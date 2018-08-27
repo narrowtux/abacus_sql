@@ -62,6 +62,18 @@ defmodule AbacusSql.Term do
     {term, query, params}
   end
 
+  @bool_ops ~w[&& || not]a
+  def convert_ast({ops, ctx, args}, query, params, root) when ops in @bool_ops do
+    {args, query, params} = reduce_args(args, query, params, root)
+    ops = case ops do
+      :&& -> :and
+      :|| -> :or
+      :not -> :not
+    end
+    term = {ops, ctx, args}
+    {term, query, params}
+  end
+
   def convert_ast({:., _, [from, {:variable, field}]}, query, params, root) do
     {_, query, params, root} = get_field(from, query, params, root)
     convert_ast({field, [], nil}, query, params, root)
