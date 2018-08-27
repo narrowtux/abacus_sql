@@ -36,9 +36,10 @@ defmodule AbacusSql.Term do
 
   @allowed_fn_calls ~w[
     sum count avg min max
-    date_trunc now interval
+    date_trunc now
   ]a
-  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when is_binary(fn_call) do
+  @allowed_fn_calls_bin Enum.map(@allowed_fn_calls, &to_string/1)
+  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when fn_call in @allowed_fn_calls_bin do
     {args, query, params} = reduce_args(args, query, params, root)
     case binary_to_allowed_atom(fn_call, @allowed_fn_calls) do
       nil ->
@@ -47,6 +48,19 @@ defmodule AbacusSql.Term do
        term = {o, ctx, args}
        {term, query, params}
     end
+  end
+
+  @allowed_casts ~w[
+    interval float text boolean
+  ]
+  def convert_ast({{cast, _, nil}, ctx, [arg]}, query, params, root) when cast in @allowed_casts do
+    {arg, query, params} = convert_ast(arg, query, params, root)
+    term = {:fragment, ctx, [
+      raw: "(",
+      expr: arg,
+      raw: ") :: " <> cast,
+    ]}
+    {term, query, params}
   end
 
   @binary_ops ~w[+ - * /]a
