@@ -139,7 +139,10 @@ defmodule AbacusSql.Term do
     get_field(field, query, params, root)
   end
   def get_field(field, query, params, {root_field, :map}) do
-    {field, query, params} = convert_ast(field, query, params, 0)
+    {field, query, params} = case field do
+      field when is_binary(field) -> convert_ast(field, query, params, 0)
+      field when is_integer(field) -> {field, query, params}
+    end
     term = {:fragment, [], [
       raw: "",
       expr: root_field,
