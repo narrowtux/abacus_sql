@@ -37,6 +37,7 @@ defmodule AbacusSql.Term do
   @allowed_fn_calls ~w[
     sum count avg min max
     date_trunc now
+    like ilike
   ]a
   @allowed_fn_calls_bin Enum.map(@allowed_fn_calls, &to_string/1)
   def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when fn_call in @allowed_fn_calls_bin do
@@ -58,7 +59,7 @@ defmodule AbacusSql.Term do
     term = {:fragment, ctx, [
       raw: "(",
       expr: arg,
-      raw: ") :: " <> cast,
+      raw: ")::text::" <> cast,
     ]}
     {term, query, params}
   end
