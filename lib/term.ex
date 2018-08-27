@@ -162,7 +162,13 @@ defmodule AbacusSql.Term do
       nil ->
         nil
       field ->
-        {field, schema.__schema__(:type, field)}
+        type = schema.__schema__(:type, field)
+        type = if function_exported?(type, :type, 0) do
+          type.type()
+        else
+          type
+        end
+        {field, type}
     end
   end
 
