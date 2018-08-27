@@ -1,5 +1,7 @@
 alias AbacusSql.Term
 alias AbacusSqlTest.{User, Repo, BlogPost}
 
-Repo.start_link
+if Mix.env == :test do
+  Repo.start_link
+end
 import Ecto.Query
