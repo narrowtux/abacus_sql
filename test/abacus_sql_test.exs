@@ -7,7 +7,7 @@ defmodule AbacusSqlTest do
 
   test "where" do
     expected_query = from q in BlogPost,
-      where: q.title == ^"Abacus is cool"
+      where: q.title == type(^"Abacus is cool", :string)
 
     query =
       from(q in BlogPost)
@@ -19,7 +19,7 @@ defmodule AbacusSqlTest do
   test "where with auto join" do
     expected_query = from q in BlogPost,
       left_join: a in assoc(q, :author),
-      where: a.name == ^"Moritz Schmale"
+      where: a.name == type(^"Moritz Schmale", :string)
 
     query =
       from(q in BlogPost)
@@ -33,7 +33,7 @@ defmodule AbacusSqlTest do
       left_join: a in assoc(q, :author)
 
     expected_query = from [b, a] in origin_query,
-      where: a.name == ^"Blabla"
+      where: a.name == type(^"Blabla", :string)
 
     query = AbacusSql.where(origin_query, ~S[author.name == "Blabla"])
 
@@ -56,7 +56,7 @@ defmodule AbacusSqlTest do
       from b in BlogPost,
         left_join: c in assoc(b, :comments),
         left_join: a in assoc(c, :author),
-        where: a.name == ^"Moritz Schmale"
+        where: a.name == type(^"Moritz Schmale", :string)
 
     query =
       from(b in BlogPost)
@@ -71,7 +71,7 @@ defmodule AbacusSqlTest do
         left_join: c in assoc(b, :comments),
         left_join: a in assoc(c, :author),
         left_join: bb in assoc(a, :blog_posts),
-        where: bb.title == ^"abacus"
+        where: bb.title == type(^"abacus", :string)
 
     query =
       from(b in BlogPost)

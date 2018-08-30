@@ -100,8 +100,8 @@ defmodule AbacusSql.Term do
   end
 
   def convert_ast(primitive, query, params, _root) when is_primitive(primitive) do
-    term = {:^, [], [length(params)]}
     type = typeof(primitive)
+    term = {:type, [], [{:^, [], [length(params)]}, type]}
     params = [{primitive, type} | params]
     {term, query, params}
   end
