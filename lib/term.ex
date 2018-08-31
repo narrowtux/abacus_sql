@@ -38,6 +38,7 @@ defmodule AbacusSql.Term do
     sum count avg min max
     date_trunc now
     like ilike
+    concat substr to_hex encode
   ]a
   @allowed_fn_calls_bin Enum.map(@allowed_fn_calls, &to_string/1)
   def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when fn_call in @allowed_fn_calls_bin do
