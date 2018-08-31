@@ -106,6 +106,13 @@ defmodule AbacusSql.Term do
     {term, query, params}
   end
 
+  def convert_ast(nil, query, params, _root) do
+    term = {:fragment, [], [
+      raw: "NULL"
+    ]}
+    {term, query, params}
+  end
+
   @compare_ops ~w[== >= <= < > !=]a
   def convert_ast({ops, ctx, args}, query, params, root) when ops in @compare_ops do
     {args, query, params} = reduce_args(args, query, params, root)
