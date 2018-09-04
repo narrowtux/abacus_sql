@@ -3,11 +3,10 @@ defmodule AbacusSql.Term do
 
   @spec to_ecto_term(Ecto.Query.t, AbacusSql.t, list) :: {:ok, Ecto.Query.t, expr :: tuple, params :: list}
   def to_ecto_term(query, term, params \\ []) do
-    {:ok, ast} = parse(term)
-
-    {term_expr, query, params} = convert_ast(ast, query, Enum.reverse(params), 0)
-
-    {:ok, query, term_expr, Enum.reverse(params)}
+    with {:ok, ast} <- parse(term),
+      {term_expr, query, params} = convert_ast(ast, query, Enum.reverse(params), 0) do
+        {:ok, query, term_expr, Enum.reverse(params)}
+    end
   end
 
   @spec convert_ast(any, Ecto.Query.t, list, integer) :: {any, Ecto.Query.t, list}
