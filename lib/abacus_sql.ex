@@ -28,7 +28,7 @@ defmodule AbacusSql do
           |> Map.put(:params, params)
       end)
     else
-      query
+      _ -> query
     end
   end
 
@@ -42,7 +42,7 @@ defmodule AbacusSql do
       }
       Map.update!(query, :wheres, &[where | &1])
     else
-      query
+      _ -> query
     end
   end
 
@@ -59,7 +59,7 @@ defmodule AbacusSql do
         order_bys ++ [order_by]
       end)
     else
-      query
+      _ -> query
     end
   end
 
@@ -74,7 +74,7 @@ defmodule AbacusSql do
         group_bys ++ [group_by]
       end)
     else
-      query
+      _ -> query
     end
   end
 end
