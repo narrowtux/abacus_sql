@@ -90,11 +90,11 @@ defmodule AbacusSql.Term do
   end
 
   def convert_ast({:., _, [from, {:variable, field}]}, query, params, root) do
-    {_, query, params, root} = get_field(from, query, params, root, false)
+    {_, query, params, root} = get_field(from, query, params, root)
     convert_ast({field, [], nil}, query, params, root)
   end
   def convert_ast({:., _, [from, expr]}, query, params, root) do
-    {_, query, params, root} = get_field(from, query, params, root, false)
+    {_, query, params, root} = get_field(from, query, params, root)
     {expr, query, params, _root} = get_field(expr, query, params, root)
     {expr, query, params}
   end
@@ -134,33 +134,32 @@ defmodule AbacusSql.Term do
   # join a.blog_posts bb
   # bb.meta_tags -> description
 
-  def get_field(path, query, params, root, last? \\ true)
-  def get_field({:variable, name}, query, params, root, last) do
-    get_field(name, query, params, root, last)
+  def get_field(path, query, params, root)
+  def get_field({:variable, name}, query, params, root) do
+    get_field(name, query, params, root)
   end
-  def get_field({:., _, [lhs, rhs]}, query, params, root, last) do
-    {_, query, params, root} = get_field(lhs, query, params, root, false)
-    get_field(rhs, query, params, root, last)
+  def get_field({:., _, [lhs, rhs]}, query, params, root) do
+    {_, query, params, root} = get_field(lhs, query, params, root)
+    get_field(rhs, query, params, root)
   end
-  def get_field({field, _, nil}, query, params, root, last) when is_binary(field) do
-    get_field(field, query, params, root, last)
+  def get_field({field, _, nil}, query, params, root) when is_binary(field) do
+    get_field(field, query, params, root)
   end
-  def get_field(field, query, params, {root_field, :map}, last?) do
+  def get_field(field, query, params, {root_field, :map}) do
     {field, query, params} = case field do
       field when is_binary(field) -> convert_ast(field, query, params, 0)
       field when is_integer(field) -> {field, query, params}
     end
-    op = if last?, do: "->>", else: "->"
     term = {:fragment, [], [
       raw: "",
       expr: root_field,
-      raw: op,
+      raw: "->",
       expr: field,
       raw: ""
     ]}
     {term, query, params, {term, :map}}
   end
-  def get_field(field, query, params, root_id, _last) when is_binary(field) do
+  def get_field(field, query, params, root_id) when is_binary(field) do
     root = get_schema_by_id(query, root_id)
     {query, term, root} = case {root, find_field(root, field), find_assoc(root, field)} do
       {_, nil, nil} ->
