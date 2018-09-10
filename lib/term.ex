@@ -4,9 +4,31 @@ defmodule AbacusSql.Term do
   @spec to_ecto_term(Ecto.Query.t, AbacusSql.t, list) :: {:ok, Ecto.Query.t, expr :: tuple, params :: list}
   def to_ecto_term(query, term, params \\ []) do
     with {:ok, ast} <- parse(term),
-      {term_expr, query, params} = convert_ast(ast, query, Enum.reverse(params), 0) do
-        {:ok, query, term_expr, Enum.reverse(params)}
+         {:ok, ast} <- preprocess(ast, query, params),
+         {term_expr, query, params} = convert_ast(ast, query, Enum.reverse(params), 0),
+         {:ok, term_expr, query, params} <- postprocess(term_expr, query, params) do
+      {:ok, query, term_expr, Enum.reverse(params)}
     end
+  end
+
+  def preprocess(ast, query, params) do
+    Application.get_env(:abacus_sql, :preprocessors, [])
+    |> Enum.reduce_while({:ok, ast}, fn preprocessor, {:ok, ast} ->
+      case preprocessor.(ast, query, params) do
+        {:ok, _ast} = res -> {:cont, res}
+        o -> {:halt, o}
+      end
+    end)
+  end
+
+  def postprocess(ast, query, params) do
+    Application.get_env(:abacus_sql, :postprocessors, [])
+    |> Enum.reduce_while({:ok, ast, query, params}, fn postprocessor, {:ok, ast, query, params} ->
+      case postprocessor.(ast, query, params) do
+        {:ok, _ast, _query, _params} = res -> {:cont, res}
+        o -> {:halt, o}
+      end
+    end)
   end
 
   @spec convert_ast(any, Ecto.Query.t, list, integer) :: {any, Ecto.Query.t, list}
@@ -52,7 +74,7 @@ defmodule AbacusSql.Term do
   end
 
   @allowed_casts ~w[
-    interval float text boolean
+    interval float text boolean numeric timestamp timestamptz date time timetz
   ]
   def convert_ast({{cast, _, nil}, ctx, [arg]}, query, params, root) when cast in @allowed_casts do
     {arg, query, params} = convert_ast(arg, query, params, root)
