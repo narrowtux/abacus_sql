@@ -10,8 +10,6 @@ defmodule AbacusSql.Term.Pre do
 
     {ast, _} = Macro.prewalk(ast, {root, query, params}, &_inject_schema/2)
 
-    IO.inspect ast
-
     {:ok, ast}
   end
 
@@ -75,7 +73,11 @@ defmodule AbacusSql.Term.Pre do
   end
 
   def _inject_shortcut(ast, current_schema, from_schema, from_ast, to_ast) do
-    if ast_equals(ast, from_ast) and current_schema == from_schema do
+    virtual_ast = case ast do
+      {:variable, name} -> {name, [schema: current_schema], nil}
+      ast -> ast
+    end
+    if ast_equals(virtual_ast, from_ast) and current_schema == from_schema do
       {to_ast, current_schema}
     else
       {ast, get_schema(ast, current_schema)}

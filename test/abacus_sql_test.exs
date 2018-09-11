@@ -5,6 +5,13 @@ defmodule AbacusSqlTest do
   import Ecto.Query
   alias AbacusSqlTest.{BlogPost}
 
+  setup do
+    Application.put_env(:abacus_sql, :preprocessors, [
+      AbacusSql.Term.Pre.shortcut(BlogPost, "authors_posts", "author.blog_posts"),
+      AbacusSql.Term.Pre.shortcut(BlogPost, "commenters", "comments.author")
+    ])
+  end
+
   test "where" do
     expected_query = from q in BlogPost,
       where: q.title == type(^"Abacus is cool", :string)
