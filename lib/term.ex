@@ -1,6 +1,10 @@
 defmodule AbacusSql.Term do
   defguardp is_primitive(term) when is_binary(term) or is_boolean(term) or is_number(term)
 
+  @preprocessors [
+    &AbacusSql.Term.Pre.inject_schema/3
+  ]
+
   @spec to_ecto_term(Ecto.Query.t, AbacusSql.t, list) :: {:ok, Ecto.Query.t, expr :: tuple, params :: list}
   def to_ecto_term(query, term, params \\ []) do
     with {:ok, ast} <- parse(term),
@@ -12,7 +16,7 @@ defmodule AbacusSql.Term do
   end
 
   def preprocess(ast, query, params) do
-    Application.get_env(:abacus_sql, :preprocessors, [])
+    Enum.concat(@preprocessors, Application.get_env(:abacus_sql, :preprocessors, []))
     |> Enum.reduce_while({:ok, ast}, fn preprocessor, {:ok, ast} ->
       case preprocessor.(ast, query, params) do
         {:ok, _ast} = res -> {:cont, res}
@@ -265,7 +269,7 @@ defmodule AbacusSql.Term do
   def get_schema_by_id(%{from: {_, schema}}, 0) when is_atom(schema) do
     schema
   end
-  def get_schema_by_id(%{joins: joins} = query, id) do
+  def get_schema_by_id(%{joins: joins} = query, id) when is_integer(id) do
     join = Enum.at(joins, id - 1)
     get_join_source(query, join)
   end
