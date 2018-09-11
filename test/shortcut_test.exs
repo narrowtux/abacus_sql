@@ -7,7 +7,8 @@ defmodule ShortcutTest do
   setup do
     Application.put_env(:abacus_sql, :preprocessors, [
       AbacusSql.Term.Pre.shortcut(BlogPost, "authors_posts", "author.blog_posts"),
-      AbacusSql.Term.Pre.shortcut(BlogPost, "commenters", "comments.author")
+      AbacusSql.Term.Pre.shortcut(BlogPost, "commenters", "comments.author"),
+      AbacusSql.Term.Pre.shortcut(BlogPost, "fields", "fields.data"),
     ])
   end
 
@@ -33,6 +34,19 @@ defmodule ShortcutTest do
       left_join: a in assoc(c, :author),
       select: %{
         "commenter" => a.name
+      }
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
+  test "shortcuts expand same name" do
+    query = AbacusSql.select(from(u in User), "lol_field", "blog_posts.fields.lol")
+
+    expected_query = from u in User,
+      left_join: b in assoc(u, :blog_posts),
+      left_join: f in assoc(b, :fields),
+      select: %{
+        "lol_field" => fragment("?->?", f.data, type(^"lol", :string))
       }
 
     assert inspect(expected_query) == inspect(query)

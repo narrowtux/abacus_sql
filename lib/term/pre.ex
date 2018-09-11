@@ -8,7 +8,7 @@ defmodule AbacusSql.Term.Pre do
   def inject_schema(ast, query, params) do
     root = Term.get_root(query)
 
-    {ast, _} = Macro.prewalk(ast, {root, query, params}, &_inject_schema/2)
+    {ast, _} = Macro.postwalk(ast, {root, query, params}, &_inject_schema/2)
 
     {:ok, ast}
   end
@@ -67,21 +67,51 @@ defmodule AbacusSql.Term.Pre do
 
   def inject_shortcut(ast, query, params, from_schema, from_ast, to_ast) do
     {:ok, to_ast} = inject_schema(to_ast, query, params)
-    {ast, _} = Macro.prewalk(ast, from_schema, &_inject_shortcut(&1, &2, from_schema, from_ast, to_ast))
+
+    root = Term.get_root(query)
+
+    ast = _inject_shortcut(ast, root, from_schema, from_ast, to_ast)
 
     {:ok, ast}
   end
 
-  def _inject_shortcut(ast, current_schema, from_schema, from_ast, to_ast) do
-    virtual_ast = case ast do
-      {:variable, name} -> {name, [schema: current_schema], nil}
-      ast -> ast
+  defp _inject_shortcut({:., ctx, [la, ra]} = ast, current_schema, from_schema, from_ast, to_ast) do
+    left_schema = get_schema(la, current_schema)
+    current_schema = get_schema(ast, current_schema)
+
+    virtual_ra = case ra do
+      {:variable, v} -> {v, [], nil}
+      _ -> ra
     end
-    if ast_equals(virtual_ast, from_ast) and current_schema == from_schema do
-      {to_ast, current_schema}
+    found_left = current_schema == from_schema and ast_equals(la, from_ast)
+    found_right = left_schema == from_schema and ast_equals(virtual_ra, from_ast)
+
+    case {found_left, found_right} do
+      {true, false} ->
+        {:., ctx, [to_ast, ra]}
+      {false, true} ->
+        {:., ctx, [la, to_ast]}
+      {true, true} ->
+        # huh?
+        ast
+      {false, false} ->
+        la = _inject_shortcut(la, current_schema, from_schema, from_ast, to_ast)
+        {:., ctx, [la, ra]}
+    end
+  end
+  defp _inject_shortcut({var, _, nil} = ast, current_schema, from_schema, from_ast, to_ast) when is_binary(var) do
+    if current_schema == from_schema and ast_equals(ast, from_ast) do
+      to_ast
     else
-      {ast, get_schema(ast, current_schema)}
+      ast
     end
+  end
+  defp _inject_shortcut({op, ctx, args}, current_schema, from_schema, from_ast, to_ast) do
+    args = Enum.map(args, &_inject_shortcut(&1, current_schema, from_schema, from_ast, to_ast))
+    {op, ctx, args}
+  end
+  defp _inject_shortcut(ast, _, _, _, _) do
+    ast
   end
 
   defp get_schema({_, ctx, _}, default) do
