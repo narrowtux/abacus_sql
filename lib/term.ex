@@ -282,6 +282,10 @@ defmodule AbacusSql.Term do
         origin_schema = get_schema_by_id(query, origin_id)
         origin_schema.__schema__(:association, assoc)
         |> Map.get(:queryable)
+      %{source: %Ecto.SubQuery{query: subquery}} ->
+        get_join_source(query, subquery)
+      %{from: {_, schema}} when is_atom(schema) ->
+        schema
     end
   end
 
