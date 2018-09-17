@@ -9,6 +9,7 @@ defmodule ShortcutTest do
       AbacusSql.Term.Pre.shortcut(BlogPost, "authors_posts", "author.blog_posts"),
       AbacusSql.Term.Pre.shortcut(BlogPost, "commenters", "comments.author"),
       AbacusSql.Term.Pre.shortcut(BlogPost, "fields", "fields.data"),
+      AbacusSql.Term.Pre.shortcut(BlogPost.Fields, "fields", "fields.data"),
     ])
   end
 
@@ -49,6 +50,15 @@ defmodule ShortcutTest do
         "lol_field" => fragment("?->?", f.data, type(^"lol", :string))
       }
 
+    assert inspect(expected_query) == inspect(query)
+
+    query = AbacusSql.select(from(b in BlogPost), "lol_field", "fields.lol")
+
+    expected_query = from b in BlogPost,
+      left_join: f in assoc(b, :fields),
+      select: %{
+        "lol_field" => fragment("?->?", f.data, type(^"lol", :string))
+      }
     assert inspect(expected_query) == inspect(query)
   end
 end
