@@ -77,8 +77,18 @@ defmodule AbacusSql.Term do
     end
   end
 
+  def convert_ast({{"unix_epoch", _, nil}, ctx, [arg]}, query, params, root) do
+    {[arg], query, params} = reduce_args([arg], query, params, root)
+    term = {:fragment, ctx, [
+      raw: "extract(epoch from ",
+      expr: arg,
+      raw: " at time zone 'utc' at time zone 'utc')"
+    ]}
+    {term, query, params}
+  end
+
   @allowed_casts ~w[
-    interval float text boolean numeric timestamp timestamptz date time timetz
+    interval float text boolean numeric timestamp timestamptz date time timetz smallint integer bigint uuid
   ]
   def convert_ast({{cast, _, nil}, ctx, [arg]}, query, params, root) when cast in @allowed_casts do
     {arg, query, params} = convert_ast(arg, query, params, root)
