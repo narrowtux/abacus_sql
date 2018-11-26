@@ -21,7 +21,7 @@ defmodule AbacusSql.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:abacus, github: "narrowtux/abacus", ref: "a39419b7c5c35581d099f68d9f9cba09c3c8aa0d"},
+      {:abacus, github: "narrowtux/abacus", ref: "fbb39bc0a11c8fa8208ad3b78728769fc4890317"},
       {:ecto, "~> 2.2"},
       {:postgrex, "~> 0.13"}
     ]
