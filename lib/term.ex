@@ -67,11 +67,11 @@ defmodule AbacusSql.Term do
     coalesce st_x st_y
   ]a
   @allowed_fn_calls_bin Enum.map(@allowed_fn_calls, &to_string/1)
-  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when fn_call in @allowed_fn_calls_bin do
+  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) do
     {args, query, params} = reduce_args(args, query, params, root)
     case binary_to_allowed_atom(fn_call, @allowed_fn_calls) do
       nil ->
-        raise "Function call #{fn_call} is not allowed"
+        raise AbacusSql.UndefinedFunctionError, function: fn_call, ctx: ctx, argc: length(args)
       o ->
        term = {o, ctx, args}
        {term, query, params}
@@ -200,7 +200,7 @@ defmodule AbacusSql.Term do
     root = get_schema_by_id(query, root_id)
     {query, term, root} = case {root, find_field(root, field), find_assoc(root, field)} do
       {_, nil, nil} ->
-        raise "could neither find #{field} as a field nor an association of #{root}"
+        raise AbacusSql.NoFieldOrAssociationFoundError, name: field, in: root
       {_, {field, type}, nil} ->
         term = {{:., [], [{:&, [], [root_id]}, field]}, [], []}
         {query, term, {term, type}}
@@ -271,7 +271,7 @@ defmodule AbacusSql.Term do
   end
   def get_table_id(%{joins: joins} = query, module) do
     case Enum.find_index(joins, &(get_join_source(query, &1) == module)) do
-      nil -> raise "table_id for #{module} could not be found"
+      nil -> raise RuntimeError, "table_id for #{module} could not be found"
       int when is_integer(int) -> int + 1
     end
   end
