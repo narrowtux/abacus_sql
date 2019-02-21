@@ -67,7 +67,7 @@ defmodule AbacusSql.Term do
     coalesce st_x st_y
   ]a
   @allowed_fn_calls_bin Enum.map(@allowed_fn_calls, &to_string/1)
-  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when fn_call in @allowed_fn_calls do
+  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when fn_call in @allowed_fn_calls_bin do
     {args, query, params} = reduce_args(args, query, params, root)
     case binary_to_allowed_atom(fn_call, @allowed_fn_calls) do
       nil ->
