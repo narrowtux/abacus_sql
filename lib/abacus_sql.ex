@@ -46,6 +46,30 @@ defmodule AbacusSql do
     end
   end
 
+  @doc """
+  Adds the given filter to the havings list.
+
+  Make sure that the query has at least one group_by clause.
+
+  This means it can be used instead of `where/2` every time
+  you only select from fields that can not appear more than once per row of the source.
+
+  The advantage is that it can filter inside `has_many` using aggregation such as `count`, `min` or `max`.
+  """
+  @spec having(Ecto.Query.t, t) :: Ecto.Query.t
+  def having(query, term) do
+    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term) do
+      having = %Ecto.Query.BooleanExpr{
+        expr: expr,
+        op: :and,
+        params: params
+      }
+      Map.update!(query, :havings, &[having | &1])
+    else
+      _ -> query
+    end
+  end
+
   @spec order_by(Ecto.Query.t, t, boolean) :: Ecto.Query.t
   def order_by(query, term, ascending? \\ true) do
     with {:ok, query, expr, params} <- Term.to_ecto_term(query, term) do
