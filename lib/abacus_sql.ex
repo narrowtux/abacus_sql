@@ -51,10 +51,11 @@ defmodule AbacusSql do
 
   Make sure that the query has at least one group_by clause.
 
-  This means it can be used instead of `where/2` every time
-  you only select from fields that can not appear more than once per row of the source.
+  The advantage is that it can filter inside `has_many` assocs
+  using aggregation such as `count`, `min` or `max`.
 
-  The advantage is that it can filter inside `has_many` using aggregation such as `count`, `min` or `max`.
+  For example: `having(BlogPost, "count(author.posts.id) > 10")` would
+  filter for blog posts whose authors have at least 10 posts.
   """
   @spec having(Ecto.Query.t, t) :: Ecto.Query.t
   def having(query, term) do
