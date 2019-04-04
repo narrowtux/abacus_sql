@@ -5,7 +5,7 @@ defmodule AbacusSql.MixProject do
     [
       app: :abacus_sql,
       version: "0.1.0",
-      elixir: "~> 1.6",
+      elixir: ">= 1.6.0",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -22,10 +22,10 @@ defmodule AbacusSql.MixProject do
   defp deps do
     [
       {:abacus, github: "narrowtux/abacus", ref: "c8195d3b179d8a3ccefd01f4363f9e4afa418d71"},
-      {:ecto, "~> 3.1"},
-      {:ecto_sql, "~> 3.1"},
-      {:postgrex, "~> 0.14"},
-      {:jason, "~> 1.1"}
+      {:ecto, ">= 3.0.0"},
+      {:ecto_sql, ">= 3.0.0"},
+      {:postgrex, "~> 0.14", only: [:test]},
+      {:jason, "~> 1.1", only: [:test]}
     ]
   end
 end
