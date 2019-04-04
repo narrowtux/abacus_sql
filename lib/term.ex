@@ -265,12 +265,12 @@ defmodule AbacusSql.Term do
   end
 
   @spec get_root(Ecto.Query.t) :: module
-  def get_root(%{from: {_, module}}) when is_atom(module) do
+  def get_root(%{from: %{source: {_, module}}}) when is_atom(module) do
     module
   end
 
   @spec get_table_id(Ecto.Query.t, module) :: integer
-  def get_table_id(%{from: {_, module}}, module) do
+  def get_table_id(%{from: %{source: {_, module}}}, module) do
     0
   end
   def get_table_id(%{joins: joins} = query, module) do
@@ -281,7 +281,7 @@ defmodule AbacusSql.Term do
   end
 
   @spec get_schema_by_id(Ecto.Query.t, integer) :: module
-  def get_schema_by_id(%{from: {_, schema}}, 0) when is_atom(schema) do
+  def get_schema_by_id(%{from: %{source: {_, schema}}}, 0) when is_atom(schema) do
     schema
   end
   def get_schema_by_id(%{joins: joins} = query, id) when is_integer(id) do
@@ -299,7 +299,7 @@ defmodule AbacusSql.Term do
         |> Map.get(:queryable)
       %{source: %Ecto.SubQuery{query: subquery}} ->
         get_join_source(query, subquery)
-      %{from: {_, schema}} when is_atom(schema) ->
+      %{from: %{source: {_, schema}}} when is_atom(schema) ->
         schema
     end
   end

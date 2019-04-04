@@ -22,8 +22,10 @@ defmodule AbacusSql.MixProject do
   defp deps do
     [
       {:abacus, github: "narrowtux/abacus", ref: "c8195d3b179d8a3ccefd01f4363f9e4afa418d71"},
-      {:ecto, "~> 2.2"},
-      {:postgrex, "~> 0.13"}
+      {:ecto, "~> 3.1"},
+      {:ecto_sql, "~> 3.1"},
+      {:postgrex, "~> 0.14"},
+      {:jason, "~> 1.1"}
     ]
   end
 end
