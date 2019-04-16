@@ -1,5 +1,6 @@
 defmodule AbacusSqlTest.BlogPost do
   use Ecto.Schema
+  use AbacusSql.Completable.Schema
 
   schema "blog_post" do
     field :title, :string

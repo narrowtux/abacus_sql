@@ -1,5 +1,6 @@
 defmodule AbacusSqlTest.Comment do
   use Ecto.Schema
+  use AbacusSql.Completable.Schema
   schema "comment" do
     field :body, :string
 

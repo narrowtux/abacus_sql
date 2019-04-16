@@ -337,7 +337,7 @@ defmodule AbacusSql.Term do
 
 
   @spec rename_variables(tuple, map) :: tuple
-  defp rename_variables(ast, vars) do
+  def rename_variables(ast, vars) do
     Macro.prewalk(ast, fn
       {atom, ctx, nil} when is_atom(atom) ->
         case Map.get(vars, atom) do

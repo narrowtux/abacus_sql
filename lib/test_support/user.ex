@@ -1,5 +1,6 @@
 defmodule AbacusSqlTest.User do
   use Ecto.Schema
+  use AbacusSql.Completable.Schema
 
   schema "user" do
     field :name, :string
