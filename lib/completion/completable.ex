@@ -1,15 +1,17 @@
 defmodule AbacusSql.Completable do
+  @alias AbacusSql.Completion.Item
   @type schema :: module
-  @type context :: term
+  @type context :: [{atom, any}]
 
   @doc """
   Returns a list of completion items that this schema offers.
 
   The passed `context` is a term that can be given to `AbacusSql.Completion.autocomplete/2`.
   """
-  @callback completable_children(context) :: {:ok, [AbacusSql.Completion.Item.t]}
+  @callback completable_children(context) :: {:ok, [Item.t], context}
 
-  def children(schema, context) do
+  @spec children(schema, context) :: {:ok, [Item.t], context}
+  def children(schema, context \\ []) do
     if function_exported?(schema, :completable_children, 1) do
       schema.completable_children(context)
     else
@@ -17,7 +19,7 @@ defmodule AbacusSql.Completable do
       if function_exported?(shim, :completable_children, 1) do
         shim.completable_children(context)
       else
-        {:ok, []}
+        {:ok, [], context}
       end
     end
   end

@@ -3,11 +3,15 @@ defmodule AbacusSql.Completion do
   @filtered_with_dot ~r/([a-z0-9\._]*)\.([a-z0-9_]+)$/
   @filtered_without_dot ~r/([a-z0-9_]*)$/
 
+  @type context :: [{atom, any}]
+  @type schema :: module | {module, context}
+
   @spec autocomplete(binary, module, any) :: {:ok, [AbacusSql.Completion.Item.t]} | {:error, any}
   def autocomplete(code, root_schema, context \\ []) do
     with {:ok, {expression, filter}} <- filter_code(code),
          {:ok, deepest_schema} <- find_deepest_schema(expression, root_schema, context),
-         {:ok, results} <- AbacusSql.Completable.children(deepest_schema, context),
+         {deepest_schema, context} <- extract_schema_context(deepest_schema, context),
+         {:ok, results, _context} <- AbacusSql.Completable.children(deepest_schema, context),
          {:ok, filtered_results} <- filter_results(results, filter) do
       {:ok, filtered_results}
     else
@@ -63,8 +67,9 @@ defmodule AbacusSql.Completion do
   end
   defp find_deepest_schema({variable, _, nil}, root_schema, context) do
     # single variable was used
-    with {:ok, result} <- find_single_result_in_schema(root_schema, variable, context) do
-      {:ok, result.type}
+    with {:ok, result, context} <- find_single_result_in_schema(root_schema, variable, context),
+         {schema, context} <- extract_schema_context(result.type, context) do
+      {:ok, {schema, context}}
     end
   end
   defp find_deepest_schema({:., _, [up, {:variable, down}]}, root_schema, context) do
@@ -76,19 +81,29 @@ defmodule AbacusSql.Completion do
     {:error, :invalid_path}
   end
 
-  @spec find_single_result_in_schema(atom() | binary(), any(), any()) ::
-          {:error, any} | {:ok, any}
+  @spec find_single_result_in_schema(schema, any(), context) ::
+          {:error, any} | {:ok, module, context}
   def find_single_result_in_schema(schema, variable, context) do
-    with {:ok, results} <- AbacusSql.Completable.children(schema, context),
+    {schema, context} = extract_schema_context(schema, context)
+    with {:ok, results, context} <- AbacusSql.Completable.children(schema, context),
          [result] <- Enum.filter(results, &(&1.code == variable)) do
-      {:ok, result}
+      {:ok, result, context}
     else
       _ ->
         {:error, :invalid_path}
     end
   end
 
+  @spec extract_schema_context(schema, context) :: {module, context}
+  def extract_schema_context(schema, context) when is_atom(schema) and is_list(context) do
+    {schema, context}
+  end
+  def extract_schema_context({schema, schema_context}, context) when is_atom(schema) and is_list(schema_context) do
+    {schema, Keyword.merge(context, schema_context)}
+  end
+
   defp filter_results(results, nothing) when is_nil(nothing) or nothing == "" do
+    results = Enum.map(results, &Map.put(&1, :filtered_code, &1.code))
     {:ok, results}
   end
   defp filter_results(results, filter) do

@@ -55,7 +55,7 @@ defmodule AbacusSql.Completable.Schema do
 
       def completable_children(context) do
         results = AbacusSql.Completable.Schema.children(__MODULE__, context, unquote(opts))
-        {:ok, results}
+        {:ok, results, context}
       end
 
       def assoc_display(_, _), do: nil
