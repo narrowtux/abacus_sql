@@ -301,6 +301,8 @@ defmodule AbacusSql.Term do
         get_join_source(query, subquery)
       %{from: %{source: {_, schema}}} when is_atom(schema) ->
         schema
+      _ ->
+        nil
     end
   end
 
