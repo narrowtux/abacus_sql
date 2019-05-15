@@ -78,6 +78,18 @@ defmodule AbacusSql.Term do
     end
   end
 
+  def convert_ast({{"at_time_zone", _, nil}, ctx, [datetime, timezone]}, query, params, root) do
+    {[datetime, timezone], query, params} = reduce_args([datetime, timezone], query, params, root)
+    term = {:fragment, ctx, [
+      raw: "(",
+      expr: datetime,
+      raw: " AT TIME ZONE ",
+      expr: timezone,
+      raw: ")"
+    ]}
+    {term, query, params}
+  end
+
   def convert_ast({{"unix_epoch", _, nil}, ctx, [arg]}, query, params, root) do
     {[arg], query, params} = reduce_args([arg], query, params, root)
     term = {:fragment, ctx, [
