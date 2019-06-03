@@ -10,21 +10,29 @@ defmodule AbacusSql do
     end
     with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, params) do
       select_item = {key, expr}
+      select_expr = {:%{}, [], [select_item]}
 
       new_select = %Ecto.Query.SelectExpr{
-        expr: {:%{}, [], [select_item]},
+        expr: select_expr,
         params: params,
         take: %{}
       }
       Map.update(query, :select, new_select, fn
         nil ->
           new_select
+
         %Ecto.Query.SelectExpr{
-          expr: {:%{}, ctx, list},
-          params: _
+          expr: {:%{}, ctx, list}
         } = select ->
           select
           |> Map.put(:expr, {:%{}, ctx, list ++ [select_item]})
+          |> Map.put(:params, params)
+
+        %Ecto.Query.SelectExpr{
+          expr: {:merge, ctx, _} = merge
+        } = select ->
+          select
+          |> Map.put(:expr, {:merge, [], [merge, select_expr]})
           |> Map.put(:params, params)
       end)
     else
