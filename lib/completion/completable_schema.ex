@@ -30,6 +30,7 @@ defmodule AbacusSql.Completable.Schema do
     (assocs ++ fields)
     |> filter_only(Keyword.get(opts, :only, nil))
     |> filter_except(Keyword.get(opts, :except, nil))
+    |> add_custom(Keyword.get(opts, :custom, []))
   end
 
   defp filter_only(results, nil), do: results
@@ -42,6 +43,16 @@ defmodule AbacusSql.Completable.Schema do
   defp filter_except(results, except) do
     except = Enum.map(except, &to_string/1)
     Enum.filter(results, fn %{code: code} -> code not in except end)
+  end
+
+  defp add_custom(results, custom) do
+    Enum.map(custom, fn {field, type} ->
+      %Item{
+        code: to_string(field),
+        type: type
+      }
+    end)
+    |> Enum.concat(results)
   end
 
   @callback assoc_description(assoc :: atom, context :: term) :: binary
