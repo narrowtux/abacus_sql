@@ -1,5 +1,5 @@
 %{
-  "abacus": {:git, "https://github.com/narrowtux/abacus.git", "c8195d3b179d8a3ccefd01f4363f9e4afa418d71", [ref: "c8195d3b179d8a3ccefd01f4363f9e4afa418d71"]},
+  "abacus": {:git, "https://github.com/narrowtux/abacus.git", "b23be98d937ae2968a152e5d38910b4e439be91e", [ref: "b23be98d937ae2968a152e5d38910b4e439be91e"]},
   "connection": {:hex, :connection, "1.0.4", "a1cae72211f0eef17705aaededacac3eb30e6625b04a6117c1b2db6ace7d5976", [:mix], [], "hexpm"},
   "db_connection": {:hex, :db_connection, "2.0.6", "bde2f85d047969c5b5800cb8f4b3ed6316c8cb11487afedac4aa5f93fd39abfa", [:mix], [{:connection, "~> 1.0.2", [hex: :connection, repo: "hexpm", optional: false]}], "hexpm"},
   "decimal": {:hex, :decimal, "1.7.0", "30d6b52c88541f9a66637359ddf85016df9eb266170d53105f02e4a67e00c5aa", [:mix], [], "hexpm"},
