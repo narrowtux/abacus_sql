@@ -100,6 +100,18 @@ defmodule AbacusSql.Term do
     {term, query, params}
   end
 
+  def convert_ast({{"extract", _, nil}, ctx, args}, query, params, root) do
+    {[timestamp, part], query, params} = reduce_args(args, query, params, root)
+    term = {:fragment, ctx, [
+      raw: "extract(",
+      expr: part,
+      raw: " from ",
+      expr: timestamp,
+      raw: ")"
+    ]}
+    {term, query, params}
+  end
+
   @allowed_casts ~w[
     interval float text boolean numeric timestamp timestamptz date time timetz smallint integer bigint uuid
   ] ++ Application.get_env(:abacus_sql, :allowed_casts, [])
