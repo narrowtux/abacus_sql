@@ -39,6 +39,27 @@ config :abacus_sql, :allowed_function_calls, [
 
 These SQL functions will be available as normal function calls.
 
+To add your own convert_ast clauses, configure a `macro_module`:
+
+```elixir
+config :abacus_sql, :macro_module, MyApp.MacroModule
+
+defmodule MyApp.MacroModule do
+  import AbacusSql.Term
+  @spec convert_ast(any, Ecto.Query.t, list, integer) :: {any, Ecto.Query.t, list}
+  # don't add a catch-all here, a FunctionClauseError on this function will automatically be handled gracefully
+  def convert_ast({{"my_macro", _, nil}, ctx, args}, query, params, root_id) do
+    {[arg0 | _rest], query, params} = reduce_args(args, query, params, root_id)
+    ast = {:frament, ctx, [
+      raw: "MY MACRO IS ",
+      expr: arg0,
+      raw: " YEAH"
+    ]}
+    {ast, query, params}
+  end
+end
+```
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed

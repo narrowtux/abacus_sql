@@ -162,10 +162,6 @@ defmodule AbacusSql.Term do
     {ast, query, params}
   end
 
-  def convert_ast({{fn_call, ctx, nil}, _, args}, _, _, _) when is_binary(fn_call) do
-    raise AbacusSql.UndefinedFunctionError, function: fn_call, ctx: ctx, argc: length(args)
-  end
-
   def convert_ast({:., _, [from, {:variable, field}]}, query, params, root) do
     {_, query, params, root} = get_field(from, query, params, root)
     convert_ast({field, [], nil}, query, params, root)
@@ -195,6 +191,37 @@ defmodule AbacusSql.Term do
     {args, query, params} = reduce_args(args, query, params, root)
     term = {ops, ctx, args}
     {term, query, params}
+  end
+
+  # catch-all, don't write new convert_ast clauses below this
+  def convert_ast(ast, query, params, root) do
+    module = Application.get_env(:abacus_sql, :macro_module)
+    {res, finalize?} = case function_exported?(module, :convert_ast, 4) do
+      false ->
+        {nil, true}
+      true ->
+        try do
+          {ast, query, params} = apply(module, :convert_ast, [ast, query, params, root])
+          {{ast, query, params}, false}
+        rescue
+          e in [FunctionClauseError] ->
+            case e do
+              %{function: :convert_ast, arity: 4, module: ^module} ->
+                {nil, true}
+              _ ->
+                reraise e, __STACKTRACE__
+            end
+        end
+    end
+    if finalize? do
+      convert_ast_finalize(ast, query, params, root)
+    else
+      res
+    end
+  end
+
+  def convert_ast_finalize({{fn_call, ctx, nil}, _, args}, _, _, _) when is_binary(fn_call) do
+    raise AbacusSql.UndefinedFunctionError, function: fn_call, ctx: ctx, argc: length(args)
   end
 
   @spec reduce_args(list(any), Ecto.Query.t, list, module) :: {list(any), Ecto.Query.t, list}
