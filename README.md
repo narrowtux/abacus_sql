@@ -17,6 +17,28 @@ and you'll get a query that will not only filter for the posts title, but also a
  where: b.title == ^"abacus", select: %{"author" => a.name}>
 ```
 
+## Configuration
+
+Allow additional type casts as such:
+
+```elixir
+config :abacus_sql, :allowed_casts, [
+  :unit, :my_custom_type
+]
+```
+
+These casts will be available as function calls: `unit("30 m")` and will be converted into a cast expression: `fragment("(?)::text::unit", type(^"30 m", :string))`.
+
+Allow additional SQL functions:
+
+```elixir
+config :abacus_sql, :allowed_function_calls, [
+  :extract, :coalesce, :st_buffer
+]
+```
+
+These SQL functions will be available as normal function calls.
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed
