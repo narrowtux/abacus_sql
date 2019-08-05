@@ -138,6 +138,30 @@ defmodule AbacusSql.Term do
     {term, query, params}
   end
 
+  def convert_ast({:if, ctx, [condition, do_block]}, query, params, root) do
+    do_block = Keyword.put_new(do_block, :else, nil)
+    args = [
+      condition,
+      Keyword.get(do_block, :do),
+      Keyword.get(do_block, :else)
+    ]
+    {[condition, if_true, if_false], query, params} = reduce_args(args, query, params, root)
+    ast = {
+      :fragment,
+      ctx,
+      [
+        raw: "CASE WHEN ",
+        expr: condition,
+        raw: " THEN ",
+        expr: if_true,
+        raw: " ELSE ",
+        expr: if_false,
+        raw: " END"
+      ]
+    }
+    {ast, query, params}
+  end
+
   def convert_ast({{fn_call, ctx, nil}, _, args}, _, _, _) when is_binary(fn_call) do
     raise AbacusSql.UndefinedFunctionError, function: fn_call, ctx: ctx, argc: length(args)
   end

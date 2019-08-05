@@ -3,7 +3,7 @@ defmodule AbacusSqlTest do
   doctest AbacusSql
 
   import Ecto.Query
-  alias AbacusSqlTest.{BlogPost}
+  alias AbacusSqlTest.{BlogPost, User}
 
   setup do
     Application.put_env(:abacus_sql, :preprocessors, [
@@ -108,6 +108,28 @@ defmodule AbacusSqlTest do
     query =
       from(b in BlogPost)
       |> AbacusSql.group_by("author_id")
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
+  test "ternary if" do
+    expected_query =
+      from ba in User,
+        left_join: bp in assoc(ba, :blog_posts),
+        group_by: bp.id,
+        select: %{
+          "posts" => fragment(
+            "CASE WHEN ? THEN ? ELSE ? END",
+            count(bp.id) > type(^0, :integer),
+            fragment("(?)::text::text", count(bp.id)),
+            type(^"none", :string)
+          )
+        }
+
+    query =
+      from(u in User)
+      |> AbacusSql.group_by("blog_posts.id")
+      |> AbacusSql.select("posts", "count(blog_posts.id) > 0 ? text(count(blog_posts.id)) : \"none\"")
 
     assert inspect(expected_query) == inspect(query)
   end
