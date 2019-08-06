@@ -396,10 +396,10 @@ defmodule AbacusSql.Term do
       Process.delete(:variables)
       vars = Enum.map(vars, fn {k, v} -> {v, k} end) |> Enum.into(%{})
       ast = rename_variables(ast, vars)
+      ast = comb_variable_access(ast)
       {:ok, ast}
     end
   end
-
 
   @spec rename_variables(tuple, map) :: tuple
   def rename_variables(ast, vars) do
@@ -411,5 +411,29 @@ defmodule AbacusSql.Term do
         end
       o -> o
     end)
+  end
+
+  @spec comb_variable_access(tuple) :: tuple
+  def comb_variable_access(ast) do
+    Macro.postwalk(ast, &_comb_variable_access/1)
+  end
+
+  def _comb_variable_access({:., ctx, args} = ast) do
+    case args do
+      [inner, {:variable, var_access}] ->
+        {:., ctx, [inner, var_access]}
+      [inner, {:variable, var_access} | rest] ->
+        {:., ctx, [
+          {:., [], [
+            inner,
+            var_access
+          ]} | rest
+        ]} |> _comb_variable_access()
+      [_, _] ->
+        ast
+    end
+  end
+  def _comb_variable_access(ast) do
+    ast
   end
 end

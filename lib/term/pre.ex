@@ -60,66 +60,102 @@ defmodule AbacusSql.Term.Pre do
 
   def shortcut(schema, from, to) do
     {:ok, from_ast} = Term.parse(from)
-    {:ok, to_ast} = Term.parse(to)
+    # {:ok, to_ast} = Term.parse(to)
 
-    &inject_shortcut(&1, &2, &3, schema, from_ast, to_ast)
+    &inject_shortcut(&1, &2, &3, schema, from_ast, to)
   end
 
-  def inject_shortcut(ast, query, params, from_schema, from_ast, to_ast) do
-    {:ok, to_ast} = inject_schema(to_ast, query, params)
+  def inject_shortcut(ast, query, params, from_schema, from_ast, replacement) do
+    deep_replace = fn parent ->
+      parent = format_access(parent)
+      "#{parent}.#{replacement}"
+    end
+    deep_ast = Macro.postwalk(from_ast, fn
+      {var, _, nil} ->
+        {:., [schema: from_schema], [{"_", [], nil}, var]}
+      ast -> ast
+    end)
+    with {:ok, ast} <- inject_macro(ast, query, params, from_schema, from_ast, fn -> replacement end),
+         {:ok, ast} <- inject_macro(ast, query, params, from_schema, deep_ast, deep_replace) do
+      {:ok, ast}
+    end
+  end
 
-    root = Term.get_root(query)
+  def macro(schema, pattern, replacer) do
+    {:ok, pattern_ast} = Term.parse(pattern)
 
-    ast = _inject_shortcut(ast, root, from_schema, from_ast, to_ast)
+    &inject_macro(&1, &2, &3, schema, pattern_ast, replacer)
+  end
+
+  def inject_macro(ast, _query, _params, schema, pattern_ast, replacer) do
+    ast = Macro.prewalk(ast, fn
+      {_, ctx, _} = original_ast ->
+        with ^schema <- Keyword.get(ctx, :schema),
+          {:matches, args} <- pattern_match_ast(original_ast, pattern_ast),
+          formula <- apply(replacer, args),
+          {:ok, ast} <- Term.parse(formula) do
+          ast
+        else
+          _ ->
+            original_ast
+        end
+      ast ->
+        ast
+    end)
 
     {:ok, ast}
   end
 
-  defp _inject_shortcut({:., ctx, [la, ra]} = ast, current_schema, from_schema, from_ast, to_ast) do
-    left_schema = get_schema(la, current_schema)
-    current_schema = get_schema(ast, current_schema)
-
-    virtual_ra = case ra do
-      {:variable, v} -> {v, [], nil}
-      _ -> ra
-    end
-    found_left = current_schema == from_schema and ast_equals(la, from_ast)
-    found_right = left_schema == from_schema and ast_equals(virtual_ra, from_ast)
-
-    case {found_left, found_right} do
-      {true, false} ->
-        {:., ctx, [to_ast, ra]}
-      {false, true} ->
-        {:., ctx, [la, to_ast]}
-      {true, true} ->
-        # huh?
-        ast
-      {false, false} ->
-        la = _inject_shortcut(la, current_schema, from_schema, from_ast, to_ast)
-        {:., ctx, [la, ra]}
+  def pattern_match(formula, pattern) do
+    with {:ok, ast} <- Term.parse(formula),
+         {:ok, pattern} <- Term.parse(pattern) do
+      pattern_match_ast(ast, pattern)
     end
   end
-  defp _inject_shortcut({var, _, nil} = ast, current_schema, from_schema, from_ast, to_ast) when is_binary(var) do
-    if current_schema == from_schema and ast_equals(ast, from_ast) do
-      to_ast
-    else
-      ast
+
+  def pattern_match_ast(ast, pattern, matches \\ [])
+  def pattern_match_ast({fun, _, args}, {pfun, _, pargs}, matches) do
+    cond do
+      fun == pfun -> reduce_pattern_match_args(args, pargs, matches)
+      is_placeholder?(pfun) -> reduce_pattern_match_args(args, pargs, matches ++ [fun])
+      true -> :nomatch
     end
   end
-  defp _inject_shortcut({op, ctx, args}, current_schema, from_schema, from_ast, to_ast) do
-    args = Enum.map(args, &_inject_shortcut(&1, current_schema, from_schema, from_ast, to_ast))
-    {op, ctx, args}
-  end
-  defp _inject_shortcut(ast, _, _, _, _) do
-    ast
+  def pattern_match_ast(ast, pattern, matches) do
+    cond do
+      is_placeholder?(pattern) -> {:matches, matches ++ [ast]}
+      ast_equals(ast, pattern) -> {:matches, matches}
+      true -> :nomatch
+    end
   end
 
-  defp get_schema({_, ctx, _}, default) do
-    Keyword.get(ctx, :schema, default)
+  def reduce_pattern_match_args(same, same, matches) do
+    {:matches, matches}
   end
-  defp get_schema(_, default) do
-    default
+  def reduce_pattern_match_args(args, pargs, matches) when length(args) == length(pargs) do
+    args
+    |> Enum.zip(pargs)
+    |> Enum.reduce_while(matches, fn {arg, parg}, matches ->
+      cond do
+        arg == parg -> {:cont, matches}
+        ast_equals(arg, parg) -> {:cont, matches}
+        is_placeholder?(parg) -> {:cont, matches ++ [arg]}
+        true -> case pattern_match_ast(arg, parg, matches) do
+          {:matches, matches} -> {:cont, matches}
+          :nomatch -> {:halt, nil}
+        end
+      end
+    end)
+    |> case do
+      nil -> :nomatch
+      matches -> {:matches, matches}
+    end
   end
+  def reduce_pattern_match_args(_, _, _), do: :nomatch
+
+  def is_placeholder?({"_", _, nil}), do: true
+  def is_placeholder?("_"), do: true
+  def is_placeholder?(_), do: false
 
   defp ast_equals({lf, _, la}, {rf, _, ra}) do
     lf == rf and args_equal(la, ra)
@@ -138,5 +174,15 @@ defmodule AbacusSql.Term.Pre do
   defp args_equal(la, ra) when is_list(la) and is_list(ra) do
     Enum.zip(la, ra)
     |> Enum.all?(fn {l, r} -> ast_equals(l, r) end)
+  end
+
+  def format_access({:., _, [parent, child]}) when is_binary(child) do
+    "#{format_access(parent)}.#{child}"
+  end
+  def format_access({variable, _, nil}) do
+    variable
+  end
+  def format_access({:., _, [parent, child]}) do
+    "#{format_access(parent)}[#{child}]"
   end
 end
