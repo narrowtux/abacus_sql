@@ -117,11 +117,11 @@ defmodule AbacusSql.Term do
   def convert_ast({ops, ctx, args}, query, params, root) when ops in @binary_ops do
     {[lhs, rhs], query, params} = reduce_args(args, query, params, root)
     term = {:fragment, ctx, [
-      raw: "",
+      raw: "(",
       expr: lhs,
       raw: to_string(ops),
       expr: rhs,
-      raw: ""
+      raw: ")"
     ]}
     {term, query, params}
   end
