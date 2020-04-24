@@ -15,11 +15,17 @@ defmodule AbacusSqlTest.Comment do
   def assoc_display(:author, _) do
     "Author"
   end
+  def assoc_display(_, _) do
+    nil
+  end
   def assoc_description(:blog_post, _) do
     "Post that was commented on"
   end
   def assoc_description(:author, _) do
     "Author of the comment"
+  end
+  def assoc_description(_, _) do
+    nil
   end
 
   def field_display(:body, _) do
@@ -31,6 +37,9 @@ defmodule AbacusSqlTest.Comment do
   def field_display(:updated_at, _) do
     "Updated"
   end
+  def field_display(_, _) do
+    nil
+  end
   def field_description(:body, _) do
     "Text of the comment"
   end
@@ -40,16 +49,7 @@ defmodule AbacusSqlTest.Comment do
   def field_description(:updated_at, _) do
     "Datetime of last update. If equal to inserted_at, it has not yet been updated"
   end
-  def field_display(_, _) do
-    nil
-  end
-  def assoc_display(_, _) do
-    nil
-  end
   def field_description(_, _) do
-    nil
-  end
-  def assoc_description(_, _) do
     nil
   end
 end

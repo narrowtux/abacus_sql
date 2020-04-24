@@ -1,5 +1,4 @@
 defmodule AbacusSql.Completable do
-  @alias AbacusSql.Completion.Item
   @type schema :: module
   @type context :: [{atom, any}]
 
