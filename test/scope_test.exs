@@ -22,6 +22,27 @@ defmodule AbacusSql.ScopeTest do
     assert inspect(query) == inspect(expected_query)
   end
 
+  test "virtual has_one assoc with recursive join" do
+    query =
+      from(b in BlogPost)
+      |> AbacusSql.scope(old_blog_post: %BlogPost{id: 13})
+      |> AbacusSql.select("old_comment", "old_blog_post.comments.body")
+      |> AbacusSql.select("old_author", "old_blog_post.comments.author.name")
+
+    expected_query = from b in BlogPost,
+      join: b1 in BlogPost,
+      on: b1.id == ^13,
+      as: :old_blog_post,
+      left_join: c2 in assoc(b1, :comments),
+      left_join: a3 in assoc(c2, :author),
+      select: %{
+        "old_comment" => c2.body,
+        "old_author" => a3.name
+      }
+
+    assert inspect(query) == inspect(expected_query)
+  end
+
   test "virtual scope data" do
     query =
       from(b in BlogPost)
