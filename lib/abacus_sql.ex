@@ -110,4 +110,17 @@ defmodule AbacusSql do
       _ -> query
     end
   end
+
+  @spec scope(Ecto.Query.t(), atom(), term() | %{__struct__: module(), __meta__: Ecto.Schema.Metadata.t()}) :: Ecto.Query.t()
+  def scope(query, key, value) do
+    scope(query, [{key, value}])
+  end
+
+  @spec scope(Ecto.Query.t(), [{atom(), term() | %{__struct__: module(), __meta__: Ecto.Schema.Metadata.t()}}]) :: Ecto.Query.t()
+  def scope(query, scope) do
+    Enum.reduce(scope, query, fn {key, value}, query ->
+      join = AbacusSql.Scope.scope_join(query, key, value)
+      Map.update!(query, :joins, &(&1 ++ [join]))
+    end)
+  end
 end

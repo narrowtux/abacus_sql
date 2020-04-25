@@ -265,18 +265,35 @@ defmodule AbacusSql.Term do
   end
   def get_field(field, query, params, root_id) when is_binary(field) do
     root = get_schema_by_id(query, root_id)
-    {query, term, root} = case {root, find_field(root, field), find_assoc(root, field)} do
-      {_, nil, nil} ->
+    {query, term, root} = case {root, find_field(root, field), find_assoc(root, field), find_join(query, root_id, field)} do
+      {_, nil, nil, nil} ->
         raise AbacusSql.NoFieldOrAssociationFoundError, name: field, in: root
-      {_, {field, type}, nil} ->
+
+      {_, {field, type}, nil, nil} ->
         term = {{:., [], [{:&, [], [root_id]}, field]}, [], []}
         {query, term, {term, type}}
-      {_, nil, assoc} when is_atom(assoc)->
+
+      {_, nil, assoc, nil} when is_atom(assoc) ->
         {query, tid} = auto_join(query, root_id, assoc)
         {query, nil, tid}
+
+      {_, nil, nil, join} ->
+        {query, nil, join}
     end
 
     {term, query, params, root}
+  end
+
+  @spec find_join(Ecto.Query.t(), pos_integer(), binary()) :: nil | pos_integer()
+  def find_join(query, root, field)
+  def find_join(query, 0, field) do
+    case Enum.find_index(query.joins, &(to_string(Map.get(&1, :as)) == field)) do
+      nil -> nil
+      index -> index + 1
+    end
+  end
+  def find_join(_query, _root, _field) do
+    nil
   end
 
   @spec auto_join(Ecto.Query.t, origin_id :: integer, assoc :: atom) :: {Ecto.Query.t, table_id :: integer}
