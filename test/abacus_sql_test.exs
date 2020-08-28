@@ -23,6 +23,19 @@ defmodule AbacusSqlTest do
     assert inspect(expected_query) == inspect(query)
   end
 
+  test "where from subquery" do
+
+    base_query = from q in BlogPost, where: q.title == type(^"Abacus is cool", :string)
+    expected_query = from(x in subquery(base_query))
+
+    query = from(y in subquery(
+      from(q in BlogPost)
+      |> AbacusSql.where(~S[title == "Abacus is cool"])
+    ))
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
   test "where with auto join" do
     expected_query = from q in BlogPost,
       left_join: a in assoc(q, :author),

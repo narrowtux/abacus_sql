@@ -345,6 +345,9 @@ defmodule AbacusSql.Term do
   end
 
   @spec get_root(Ecto.Query.t) :: module
+  def get_root(%{from: %{source: %Ecto.SubQuery{query: query}}}) do
+    get_root(query)
+  end
   def get_root(%{from: %{source: {_, module}}}) when is_atom(module) do
     module
   end
