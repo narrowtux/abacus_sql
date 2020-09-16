@@ -25,13 +25,13 @@ defmodule AbacusSqlTest do
 
   test "where from subquery" do
 
-    base_query = from q in BlogPost, where: q.title == type(^"Abacus is cool", :string)
-    expected_query = from(x in subquery(base_query))
+    base_query = from q in BlogPost
+    expected_query = from x in subquery(base_query), where: x.title == type(^"Abacus is cool", :string)
 
     query = from(y in subquery(
       from(q in BlogPost)
-      |> AbacusSql.where(~S[title == "Abacus is cool"])
     ))
+    |> AbacusSql.where(~S[title == "Abacus is cool"])
 
     assert inspect(expected_query) == inspect(query)
   end

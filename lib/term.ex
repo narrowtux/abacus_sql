@@ -358,14 +358,23 @@ defmodule AbacusSql.Term do
   end
   def get_table_id(%{joins: joins} = query, module) do
     case Enum.find_index(joins, &(get_join_source(query, &1) == module)) do
-      nil -> raise RuntimeError, "table_id for #{module} could not be found"
-      int when is_integer(int) -> int + 1
+      nil ->
+        case query do
+          %{from: %{source: %Ecto.SubQuery{query: query}}} -> get_table_id(query, module)
+          _ ->  raise RuntimeError, "table_id for #{module} could not be found"
+        end
+
+      int when is_integer(int) ->
+        int + 1
     end
   end
 
   @spec get_schema_by_id(Ecto.Query.t, integer) :: module
   def get_schema_by_id(%{from: %{source: {_, schema}}}, 0) when is_atom(schema) do
     schema
+  end
+  def get_schema_by_id(%{from: %{source: %Ecto.SubQuery{query: query}}}, 0) do
+    get_schema_by_id(query, 0)
   end
   def get_schema_by_id(%{joins: joins} = query, id) when is_integer(id) do
     join = Enum.at(joins, id - 1)

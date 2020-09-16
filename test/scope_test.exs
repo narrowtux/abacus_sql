@@ -23,6 +23,10 @@ defmodule AbacusSql.ScopeTest do
   end
 
   test "virtual has_one assoc with recursive join" do
+    # here, we're testing if accessing an assoc of a virtual has_one will
+    # generate the correct joins
+    # It should not join from the root table at all
+
     query =
       from(b in BlogPost)
       |> AbacusSql.scope(old_blog_post: %BlogPost{id: 13})
