@@ -4,6 +4,7 @@ defmodule AbacusSql.Completable.Schema do
   def children(schema, context, opts \\ []) do
     assocs =
       schema.__schema__(:associations)
+      |> Enum.reject(& schema.__schema__(:association, &1).__struct__ == Ecto.Association.HasThrough)
       |> Enum.map(fn assoc ->
         details = schema.__schema__(:association, assoc)
         type = details.related
