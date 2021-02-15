@@ -39,11 +39,27 @@ defmodule AbacusSqlTest do
   test "where with auto join" do
     expected_query = from q in BlogPost,
       left_join: a in assoc(q, :author),
-      where: a.name == type(^"Moritz Schmale", :string)
+      where: a.name == type(^"Moritz Schmale", :string),
+      select: %{"custom" => a.name}
 
     query =
       from(q in BlogPost)
       |> AbacusSql.where(~S[author.name == "Moritz Schmale"])
+      |> AbacusSql.select("custom", "author.name")
+
+    assert inspect(expected_query) == inspect(query)
+  end
+
+  test "where with auto join when join already exists with an alias" do
+    expected_query = from q in BlogPost,
+      left_join: a in assoc(q, :author), as: :author,
+      where: a.name == type(^"Moritz Schmale", :string),
+      select: %{"custom" => a.name}
+
+    query =
+      from(q in BlogPost, left_join: a in assoc(q, :author), as: :author)
+      |> AbacusSql.where(~S[author.name == "Moritz Schmale"])
+      |> AbacusSql.select("custom", "author.name")
 
     assert inspect(expected_query) == inspect(query)
   end
