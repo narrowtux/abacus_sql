@@ -265,19 +265,19 @@ defmodule AbacusSql.Term do
   end
   def get_field(field, query, params, root_id) when is_binary(field) do
     root = get_schema_by_id(query, root_id)
-    {query, term, root} = case {root, find_field(root, field), find_assoc(root, field), find_join(query, root_id, field)} do
-      {_, nil, nil, nil} ->
+    {query, term, root} = case {find_field(root, field), find_assoc(root, field), find_join(query, root_id, field)} do
+      {nil, nil, nil} ->
         raise AbacusSql.NoFieldOrAssociationFoundError, name: field, in: root
 
-      {_, {field, type}, nil, nil} ->
+      {{field, type}, nil, nil} ->
         term = {{:., [], [{:&, [], [root_id]}, field]}, [], []}
         {query, term, {term, type}}
 
-      {_, nil, assoc, nil} when is_atom(assoc) ->
+      {nil, assoc, nil} when is_atom(assoc) ->
         {query, tid} = auto_join(query, root_id, assoc)
         {query, nil, tid}
 
-      {_, nil, nil, join} ->
+      {nil, _, join} ->
         {query, nil, join}
     end
 
