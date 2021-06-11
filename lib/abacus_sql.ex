@@ -14,7 +14,7 @@ defmodule AbacusSql do
   ## Examples
 
       from(u in User, group_by: u.id)
-      |> AbacuSql.where("name == \"Peter\""))
+      |> AbacuSql.where(~S[name == "Peter"]))
       |> AbacusSql.select("name", "name")
       # blog_posts assoc is automatically joined
       |> AbacusSql.select("post_count", "count(blog_posts.id)")
@@ -53,7 +53,7 @@ defmodule AbacusSql do
   Example:
 
       query = from u in User
-      query = select(query, "name", "concat(name, \" (\", count(blog_posts.id), \" posts)\")")
+      query = select(query, "name", ~S[concat(name, " (", count(blog_posts.id), " posts)")])
       Repo.all(query) == [%{"name" => "Peter (31 posts)"}, %{"name" => "Mark (13 posts)"}]
   """
   @spec select(Ecto.Query.t, atom | String.t, t, options) :: Ecto.Query.t
