@@ -4,15 +4,58 @@ defmodule AbacusSql do
   @type options :: [option]
   @type option :: root_option
 
+  @moduledoc """
+  Use AbacusSql to introduce powerful customizable query features to your application.
+
+  By leveraging the safe to execute expression syntax of Abacus, Ecto queries can
+  be modified with filters (via where/3), additional custom selects, custom order_by clauses,
+  and more.
+
+  ## Examples
+
+      from(u in User, group_by: u.id)
+      |> AbacuSql.where("name == \"Peter\""))
+      |> AbacusSql.select("name", "name")
+      # blog_posts assoc is automatically joined
+      |> AbacusSql.select("post_count", "count(blog_posts.id)")
+      |> AbacusSql.order_by("name", true)
+
+      # take a filter from plug params
+      from(u in User)
+      |> where(Map.get(params, "filter", "true"))
+  """
+
   @typedoc """
   Default: 0
 
   Specifies which source in the query should be used as root. It can either be
   given as a table id (0 is the actual root, 1-n is the first-nth join), or
   as an alias.
+
+  The expressions will then have the given source as their root, meaning their
+  fields and assocs are directly accessible.
+
+  Example:
+
+      query = from u in User, join bp in assoc(u, :blog_posts), as: :blog_posts
+      AbacusSql.where(query, "title != null", root: :blog_posts)
+
+  otherwise we'd have to write the where expression like this:
+
+      query = from u in User, join bp in assoc(u, :blog_posts)
+      AbacusSql.where(query, "blog_posts.title != null")
   """
   @type root_option :: {:root, integer() | atom()}
 
+  @doc """
+  Adds or merges a selection to the query.
+
+  Example:
+
+      query = from u in User
+      query = select(query, "name", "concat(name, \" (\", count(blog_posts.id), \" posts)\")")
+      Repo.all(query) == [%{"name" => "Peter (31 posts)"}, %{"name" => "Mark (13 posts)"}]
+  """
   @spec select(Ecto.Query.t, atom | String.t, t, options) :: Ecto.Query.t
   def select(query, key, term, opts \\ []) do
     params = case query.select do
@@ -51,6 +94,9 @@ defmodule AbacusSql do
     end
   end
 
+  @doc """
+  Adds an and_where clause to the query.
+  """
   @spec where(Ecto.Query.t, t, options) :: Ecto.Query.t
   def where(query, term, opts \\ []) do
     with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, [], opts) do
@@ -90,6 +136,9 @@ defmodule AbacusSql do
     end
   end
 
+  @doc """
+  Adds an order_by expression to the query.
+  """
   @spec order_by(Ecto.Query.t, t, boolean, options) :: Ecto.Query.t
   def order_by(query, term, ascending? \\ true, opts \\ []) do
     with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, [], opts) do
@@ -107,6 +156,9 @@ defmodule AbacusSql do
     end
   end
 
+  @doc """
+  Adds a group_by expression to the query
+  """
   @spec group_by(Ecto.Query.t, t, options) :: Ecto.Query.t
   def group_by(query, term, opts \\ []) do
     with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, [], opts) do
@@ -122,11 +174,29 @@ defmodule AbacusSql do
     end
   end
 
+  @doc """
+  Adds scoped data to the query. That data is accessible by simply accessing the given key.
+
+  Example:
+
+      from(u in User)
+      |> AbacusSql.scope(:some_number, 13)
+      |> AbacusSql.where("count(blog_posts.id) < some_number")
+  """
   @spec scope(Ecto.Query.t(), atom(), term() | %{__struct__: module(), __meta__: Ecto.Schema.Metadata.t()}) :: Ecto.Query.t()
   def scope(query, key, value) do
     scope(query, [{key, value}])
   end
 
+    @doc """
+    Adds scoped data to the query. That data is accessible by simply accessing the given key.
+
+    Example:
+
+      from(u in User)
+      |> AbacusSql.scope(some_number: 13)
+      |> AbacusSql.where("count(blog_posts.id) < some_number")
+  """
   @spec scope(Ecto.Query.t(), [{atom(), term() | %{__struct__: module(), __meta__: Ecto.Schema.Metadata.t()}}]) :: Ecto.Query.t()
   def scope(query, scope) do
     Enum.reduce(scope, query, fn {key, value}, query ->
