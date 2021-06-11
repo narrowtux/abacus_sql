@@ -4,7 +4,7 @@ defmodule AbacusSql.MixProject do
   def project do
     [
       app: :abacus_sql,
-      version: "2.0.0",
+      version: "2.1.0",
       elixir: ">= 1.6.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
