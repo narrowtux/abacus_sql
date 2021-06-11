@@ -13,8 +13,10 @@ defmodule AbacusSqlTest do
   end
 
   test "where" do
-    expected_query = from q in BlogPost,
-      where: q.title == type(^"Abacus is cool", :string)
+    expected_query =
+      from(q in BlogPost,
+        where: q.title == type(^"Abacus is cool", :string)
+      )
 
     query =
       from(q in BlogPost)
@@ -24,23 +26,25 @@ defmodule AbacusSqlTest do
   end
 
   test "where from subquery" do
+    base_query = from(q in BlogPost)
 
-    base_query = from q in BlogPost
-    expected_query = from x in subquery(base_query), where: x.title == type(^"Abacus is cool", :string)
+    expected_query =
+      from(x in subquery(base_query), where: x.title == type(^"Abacus is cool", :string))
 
-    query = from(y in subquery(
-      from(q in BlogPost)
-    ))
-    |> AbacusSql.where(~S[title == "Abacus is cool"])
+    query =
+      from(y in subquery(from(q in BlogPost)))
+      |> AbacusSql.where(~S[title == "Abacus is cool"])
 
     assert inspect(expected_query) == inspect(query)
   end
 
   test "where with auto join" do
-    expected_query = from q in BlogPost,
-      left_join: a in assoc(q, :author),
-      where: a.name == type(^"Moritz Schmale", :string),
-      select: %{"custom" => a.name}
+    expected_query =
+      from(q in BlogPost,
+        left_join: a in assoc(q, :author),
+        where: a.name == type(^"Moritz Schmale", :string),
+        select: %{"custom" => a.name}
+      )
 
     query =
       from(q in BlogPost)
@@ -51,10 +55,13 @@ defmodule AbacusSqlTest do
   end
 
   test "where with auto join when join already exists with an alias" do
-    expected_query = from q in BlogPost,
-      left_join: a in assoc(q, :author), as: :author,
-      where: a.name == type(^"Moritz Schmale", :string),
-      select: %{"custom" => a.name}
+    expected_query =
+      from(q in BlogPost,
+        left_join: a in assoc(q, :author),
+        as: :author,
+        where: a.name == type(^"Moritz Schmale", :string),
+        select: %{"custom" => a.name}
+      )
 
     query =
       from(q in BlogPost, left_join: a in assoc(q, :author), as: :author)
@@ -65,11 +72,15 @@ defmodule AbacusSqlTest do
   end
 
   test "no duplicate joins" do
-    origin_query = from q in BlogPost,
-      left_join: a in assoc(q, :author)
+    origin_query =
+      from(q in BlogPost,
+        left_join: a in assoc(q, :author)
+      )
 
-    expected_query = from [b, a] in origin_query,
-      where: a.name == type(^"Blabla", :string)
+    expected_query =
+      from([b, a] in origin_query,
+        where: a.name == type(^"Blabla", :string)
+      )
 
     query = AbacusSql.where(origin_query, ~S[author.name == "Blabla"])
 
@@ -77,8 +88,10 @@ defmodule AbacusSqlTest do
   end
 
   test "custom select" do
-    expected_query = from q in BlogPost,
-      select: %{"custom" => q.title}
+    expected_query =
+      from(q in BlogPost,
+        select: %{"custom" => q.title}
+      )
 
     query =
       from(q in BlogPost)
@@ -89,10 +102,11 @@ defmodule AbacusSqlTest do
 
   test "auto-join 2 deep" do
     expected_query =
-      from b in BlogPost,
+      from(b in BlogPost,
         left_join: c in assoc(b, :comments),
         left_join: a in assoc(c, :author),
         where: a.name == type(^"Moritz Schmale", :string)
+      )
 
     query =
       from(b in BlogPost)
@@ -103,11 +117,12 @@ defmodule AbacusSqlTest do
 
   test "auto-join 3 deep" do
     expected_query =
-      from b in BlogPost,
+      from(b in BlogPost,
         left_join: c in assoc(b, :comments),
         left_join: a in assoc(c, :author),
         left_join: bb in assoc(a, :blog_posts),
         where: bb.title == type(^"abacus", :string)
+      )
 
     query =
       from(b in BlogPost)
@@ -118,9 +133,10 @@ defmodule AbacusSqlTest do
 
   test "order by" do
     expected_query =
-      from b in BlogPost,
+      from(b in BlogPost,
         left_join: a in assoc(b, :author),
         order_by: a.name
+      )
 
     query =
       from(b in BlogPost)
@@ -131,8 +147,9 @@ defmodule AbacusSqlTest do
 
   test "group by" do
     expected_query =
-      from b in BlogPost,
+      from(b in BlogPost,
         group_by: b.author_id
+      )
 
     query =
       from(b in BlogPost)
@@ -143,23 +160,38 @@ defmodule AbacusSqlTest do
 
   test "ternary if" do
     expected_query =
-      from ba in User,
+      from(ba in User,
         left_join: bp in assoc(ba, :blog_posts),
         group_by: bp.id,
         select: %{
-          "posts" => fragment(
-            "CASE WHEN ? THEN ? ELSE ? END",
-            count(bp.id) > type(^0, :integer),
-            fragment("(?)::text::text", count(bp.id)),
-            type(^"none", :string)
-          )
+          "posts" =>
+            fragment(
+              "CASE WHEN ? THEN ? ELSE ? END",
+              count(bp.id) > type(^0, :integer),
+              fragment("(?)::text::text", count(bp.id)),
+              type(^"none", :string)
+            )
         }
+      )
 
     query =
       from(u in User)
       |> AbacusSql.group_by("blog_posts.id")
-      |> AbacusSql.select("posts", "count(blog_posts.id) > 0 ? text(count(blog_posts.id)) : \"none\"")
+      |> AbacusSql.select(
+        "posts",
+        "count(blog_posts.id) > 0 ? text(count(blog_posts.id)) : \"none\""
+      )
 
     assert inspect(expected_query) == inspect(query)
+  end
+
+  test "different root" do
+    query = from(u in User, join: p in assoc(u, :blog_posts), as: :posts)
+
+    expected_query = from([u, p] in query, where: p.title == type(^"Title", :string))
+
+    abacus_query = AbacusSql.where(query, "title == \"Title\"", root: :posts)
+
+    assert inspect(expected_query) == inspect(abacus_query)
   end
 end

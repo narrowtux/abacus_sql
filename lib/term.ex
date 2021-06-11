@@ -5,11 +5,16 @@ defmodule AbacusSql.Term do
     &AbacusSql.Term.Pre.inject_schema/3
   ]
 
-  @spec to_ecto_term(Ecto.Query.t, AbacusSql.t, list) :: {:ok, Ecto.Query.t, expr :: tuple, params :: list}
-  def to_ecto_term(query, term, params \\ []) do
+  @spec to_ecto_term(Ecto.Query.t, AbacusSql.t, list, AbacusSql.options()) :: {:ok, Ecto.Query.t, expr :: tuple, params :: list}
+  def to_ecto_term(query, term, params \\ [], opts \\ []) do
+    root_table = case Keyword.get(opts, :root, 0) do
+      table_id when is_integer(table_id) -> table_id
+      source_alias when is_atom(source_alias) -> Map.get(query.aliases, source_alias)
+    end
+
     with {:ok, ast} <- parse(term),
          {:ok, ast} <- preprocess(ast, query, params),
-         {term_expr, query, params} = convert_ast(ast, query, Enum.reverse(params), 0),
+         {term_expr, query, params} = convert_ast(ast, query, Enum.reverse(params), root_table),
          {:ok, term_expr, query, params} <- postprocess(term_expr, query, params) do
       {:ok, query, term_expr, Enum.reverse(params)}
     end

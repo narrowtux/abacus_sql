@@ -1,14 +1,25 @@
 defmodule AbacusSql do
   alias AbacusSql.Term
   @type t :: binary | list | tuple
+  @type options :: [option]
+  @type option :: root_option
 
-  @spec select(Ecto.Query.t, atom | String.t, t) :: Ecto.Query.t
-  def select(query, key, term) do
+  @typedoc """
+  Default: 0
+
+  Specifies which source in the query should be used as root. It can either be
+  given as a table id (0 is the actual root, 1-n is the first-nth join), or
+  as an alias.
+  """
+  @type root_option :: {:root, integer() | atom()}
+
+  @spec select(Ecto.Query.t, atom | String.t, t, options) :: Ecto.Query.t
+  def select(query, key, term, opts \\ []) do
     params = case query.select do
       %{params: params} -> params
       _ -> []
     end
-    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, params) do
+    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, params, opts) do
       select_item = {key, expr}
       select_expr = {:%{}, [], [select_item]}
 
@@ -40,9 +51,9 @@ defmodule AbacusSql do
     end
   end
 
-  @spec where(Ecto.Query.t, t) :: Ecto.Query.t
-  def where(query, term) do
-    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term) do
+  @spec where(Ecto.Query.t, t, options) :: Ecto.Query.t
+  def where(query, term, opts \\ []) do
+    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, [], opts) do
       where = %Ecto.Query.BooleanExpr{
         expr: expr,
         op: :and,
@@ -65,9 +76,9 @@ defmodule AbacusSql do
   For example: `having(BlogPost, "count(author.posts.id) > 10")` would
   filter for blog posts whose authors have at least 10 posts.
   """
-  @spec having(Ecto.Query.t, t) :: Ecto.Query.t
-  def having(query, term) do
-    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term) do
+  @spec having(Ecto.Query.t, t, options) :: Ecto.Query.t
+  def having(query, term, opts \\ []) do
+    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, [], opts) do
       having = %Ecto.Query.BooleanExpr{
         expr: expr,
         op: :and,
@@ -79,9 +90,9 @@ defmodule AbacusSql do
     end
   end
 
-  @spec order_by(Ecto.Query.t, t, boolean) :: Ecto.Query.t
-  def order_by(query, term, ascending? \\ true) do
-    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term) do
+  @spec order_by(Ecto.Query.t, t, boolean, options) :: Ecto.Query.t
+  def order_by(query, term, ascending? \\ true, opts \\ []) do
+    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, [], opts) do
       direction = if ascending?, do: :asc, else: :desc
 
       Map.update!(query, :order_bys, fn order_bys ->
@@ -96,9 +107,9 @@ defmodule AbacusSql do
     end
   end
 
-  @spec group_by(Ecto.Query.t, t) :: Ecto.Query.t
-  def group_by(query, term) do
-    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term) do
+  @spec group_by(Ecto.Query.t, t, options) :: Ecto.Query.t
+  def group_by(query, term, opts \\ []) do
+    with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, [], opts) do
       Map.update!(query, :group_bys, fn group_bys ->
         group_by = %Ecto.Query.QueryExpr{
           expr: [expr],
