@@ -72,12 +72,15 @@ defmodule AbacusSql.Completion do
       {:ok, {schema, context}}
     end
   end
+  defp find_deepest_schema({:., _, [{up, _, nil}, down]}, root_schema, context) do
+    find_deepest_schema({:., [], [up, {:variable, down}]}, root_schema, context)
+  end
   defp find_deepest_schema({:., _, [up, {:variable, down}]}, root_schema, context) do
     with {:ok, up_schema} <- find_deepest_schema(up, root_schema, context) do
       find_deepest_schema({down, [], nil}, up_schema, context)
     end
   end
-  defp find_deepest_schema(_, _, _) do
+  defp find_deepest_schema(expr, module, term) do
     {:error, :invalid_path}
   end
 
