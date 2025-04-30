@@ -51,6 +51,11 @@ defmodule AbacusSql do
   @doc """
   Adds or merges a selection to the query.
 
+  Options:
+
+   * `as` - if set, will wrap the expression with the fragment "? AS \#{name}". Only letters, digits, - and _ are allowed, the function will raise otherwise.
+   * `root` - if set, will use the given alias as the root table
+
   Example:
 
       query = from u in User
@@ -64,6 +69,16 @@ defmodule AbacusSql do
       _ -> []
     end
     with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, params, opts) do
+      expr = case Keyword.get(opts, :as, nil) do
+        nil ->
+          expr
+
+        column_name ->
+          ensure_safe_alias!(column_name)
+
+          {:fragment, [], [raw: "", expr: expr, raw: ~s[ AS "#{column_name}"]]}
+      end
+
       select_item = {key, expr}
       select_expr = {:%{}, [], [select_item]}
 
@@ -188,6 +203,28 @@ defmodule AbacusSql do
     end
   end
 
+  def order_by_alias(query, as, direction \\ :asc) do
+    ensure_safe_alias!(as)
+
+    Map.update!(query, :order_bys, fn order_bys ->
+      expr = {:fragment, [], [raw: ~s["#{as}"]]}
+      order_by = %Ecto.Query.QueryExpr{
+        expr: [{direction, expr}],
+      }
+      order_bys ++ [order_by]
+    end)
+  end
+
+  def order_by_index(query, index, direction \\ :asc) when is_integer(index) and index >= 0 do
+    Map.update!(query, :order_bys, fn order_bys ->
+      expr = {:fragment, [], [raw: ~s[#{index + 1}]]}
+      order_by = %Ecto.Query.QueryExpr{
+        expr: [{direction, expr}],
+      }
+      order_bys ++ [order_by]
+    end)
+  end
+
   @doc """
   Adds a group_by expression to the query
   """
@@ -235,5 +272,11 @@ defmodule AbacusSql do
       join = AbacusSql.Scope.scope_join(query, key, value)
       Map.update!(query, :joins, &(&1 ++ [join]))
     end)
+  end
+
+  defp ensure_safe_alias!(name) do
+    if not Regex.match?(~r/^[a-zA-Z0-9\-_]+$/, name) do
+      raise ArgumentError, message: "#{name} is not safe to use as an alias. Since aliases can't be parametrized, only names with latin letters, digits and the symbols `-` and `_` are allowed."
+    end
   end
 end

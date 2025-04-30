@@ -204,4 +204,24 @@ defmodule AbacusSqlTest do
     assert inspect(expected_query) == inspect(abacus_query)
 
   end
+
+  test "select supports as option" do
+    query =
+      from(u in User)
+      |> AbacusSql.select("name", "name", as: "my_own_column_name")
+      |> AbacusSql.order_by_alias("my_own_column_name", :desc_nulls_last)
+
+    # just test if this query runs at all
+    AbacusSqlTest.Repo.all(query)
+  end
+
+  test "order_by_index" do
+    query =
+      from(u in User)
+      |> AbacusSql.select("name", "name", as: "my_own_column_name")
+      |> AbacusSql.order_by_index(0, :desc_nulls_last)
+
+    # just test if this query runs at all
+    AbacusSqlTest.Repo.all(query)
+  end
 end
