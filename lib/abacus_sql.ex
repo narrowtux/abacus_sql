@@ -1,5 +1,6 @@
 defmodule AbacusSql do
   alias AbacusSql.Term
+  require Logger
   @type t :: binary | list | tuple
   @type options :: [option]
   @type option :: root_option
@@ -83,7 +84,7 @@ defmodule AbacusSql do
           |> Map.put(:params, params)
 
         %Ecto.Query.SelectExpr{
-          expr: {:merge, ctx, _} = merge
+          expr: {:merge, _ctx, _} = merge
         } = select ->
           select
           |> Map.put(:expr, {:merge, [], [merge, select_expr]})
@@ -92,6 +93,37 @@ defmodule AbacusSql do
     else
       _ -> query
     end
+  end
+
+  @doc """
+  Selects the given terms as a list.
+
+  Example:
+
+      query = from u in User
+      query = select(query, ["name", "count(blog_posts.id)"])
+      Repo.all(query) == [["Peter", 31], ["Mark", 13]]
+  """
+  def select_list(query, terms, opts \\ []) do
+    nil = query.select
+
+    {query, exprs, params} =
+      Enum.reduce(terms, {query, [], []}, fn term, {query, exprs, params} ->
+        with {:ok, query, expr, params} <- Term.to_ecto_term(query, term, params, opts) do
+          {query, [expr | exprs], params}
+        else
+          error ->
+            Logger.error("while compiling term #{inspect term}:\n #{inspect(error)}")
+            {query, [nil | exprs], params}
+        end
+      end)
+
+    select = %Ecto.Query.SelectExpr{
+      expr: Enum.reverse(exprs),
+      params: params,
+    }
+
+    Map.put(query, :select, select)
   end
 
   @doc """

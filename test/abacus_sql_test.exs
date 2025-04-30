@@ -194,4 +194,14 @@ defmodule AbacusSqlTest do
 
     assert inspect(expected_query) == inspect(abacus_query)
   end
+
+  test "select_list" do
+    query = from(u in User)
+
+    expected_query = from([u] in query, left_join: c in assoc(u, :comments), select: [u.name, c.body, type(^3, :integer), type(^true, :boolean)])
+    abacus_query = AbacusSql.select_list(query, ["name", "comments.body", "3", "true"])
+
+    assert inspect(expected_query) == inspect(abacus_query)
+
+  end
 end
