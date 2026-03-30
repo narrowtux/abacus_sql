@@ -5,12 +5,14 @@ defmodule AbacusSql.Term do
     &AbacusSql.Term.Pre.inject_schema/3
   ]
 
-  @spec to_ecto_term(Ecto.Query.t, AbacusSql.t, list, AbacusSql.options()) :: {:ok, Ecto.Query.t, expr :: tuple, params :: list}
+  @spec to_ecto_term(Ecto.Query.t(), AbacusSql.t(), list, AbacusSql.options()) ::
+          {:ok, Ecto.Query.t(), expr :: tuple, params :: list}
   def to_ecto_term(query, term, params \\ [], opts \\ []) do
-    root_table = case Keyword.get(opts, :root, 0) do
-      table_id when is_integer(table_id) -> table_id
-      source_alias when is_atom(source_alias) -> Map.get(query.aliases, source_alias)
-    end
+    root_table =
+      case Keyword.get(opts, :root, 0) do
+        table_id when is_integer(table_id) -> table_id
+        source_alias when is_atom(source_alias) -> Map.get(query.aliases, source_alias)
+      end
 
     with {:ok, ast} <- parse(term),
          {:ok, ast} <- preprocess(ast, query, params),
@@ -40,27 +42,36 @@ defmodule AbacusSql.Term do
     end)
   end
 
-  @spec convert_ast(any, Ecto.Query.t, list, integer) :: {any, Ecto.Query.t, list}
+  @spec convert_ast(any, Ecto.Query.t(), list, integer) :: {any, Ecto.Query.t(), list}
   def convert_ast(ast, query, params, root)
+
   def convert_ast({binary, _, nil}, query, params, root) when is_binary(binary) do
     {term, query, params, _root} = get_field(binary, query, params, root)
     {term, query, params}
   end
 
-  def convert_ast({ops, ctx, [l, r]}, query, params, root) when ops in ~w[== !=]a and (is_nil(r) or is_nil(l)) do
-    fragment = case ops do
-      :== -> " IS NULL"
-      :!= -> " IS NOT NULL"
-    end
-    {literal, query, params} = case {l, r} do
-      {nil, lit} -> convert_ast(lit, query, params, root)
-      {lit, nil} -> convert_ast(lit, query, params, root)
-    end
-    expr = {:fragment, ctx, [
-      raw: "",
-      expr: literal,
-      raw: fragment
-    ]}
+  def convert_ast({ops, ctx, [l, r]}, query, params, root)
+      when ops in ~w[== !=]a and (is_nil(r) or is_nil(l)) do
+    fragment =
+      case ops do
+        :== -> " IS NULL"
+        :!= -> " IS NOT NULL"
+      end
+
+    {literal, query, params} =
+      case {l, r} do
+        {nil, lit} -> convert_ast(lit, query, params, root)
+        {lit, nil} -> convert_ast(lit, query, params, root)
+      end
+
+    expr =
+      {:fragment, ctx,
+       [
+         raw: "",
+         expr: literal,
+         raw: fragment
+       ]}
+
     {expr, query, params}
   end
 
@@ -70,87 +81,113 @@ defmodule AbacusSql.Term do
     like ilike
     concat substr to_hex encode
     coalesce st_x st_y
-  ]a ++ Application.get_env(:abacus_sql, :allowed_function_calls, [])
+  ]a ++ Application.compile_env(:abacus_sql, :allowed_function_calls, [])
   @allowed_fn_calls_bin Enum.map(@allowed_fn_calls, &to_string/1)
-  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root) when fn_call in @allowed_fn_calls_bin do
+  def convert_ast({{fn_call, _, nil}, ctx, args}, query, params, root)
+      when fn_call in @allowed_fn_calls_bin do
     {args, query, params} = reduce_args(args, query, params, root)
+
     case binary_to_allowed_atom(fn_call, @allowed_fn_calls) do
       nil ->
         raise AbacusSql.UndefinedFunctionError, function: fn_call, ctx: ctx, argc: length(args)
+
       o ->
-       term = {o, ctx, args}
-       {term, query, params}
+        term = {o, ctx, args}
+        {term, query, params}
     end
   end
 
   def convert_ast({{"at_time_zone", _, nil}, ctx, [datetime, timezone]}, query, params, root) do
     {[datetime, timezone], query, params} = reduce_args([datetime, timezone], query, params, root)
-    term = {:fragment, ctx, [
-      raw: "(",
-      expr: datetime,
-      raw: " AT TIME ZONE ",
-      expr: timezone,
-      raw: ")"
-    ]}
+
+    term =
+      {:fragment, ctx,
+       [
+         raw: "(",
+         expr: datetime,
+         raw: " AT TIME ZONE ",
+         expr: timezone,
+         raw: ")"
+       ]}
+
     {term, query, params}
   end
 
   def convert_ast({{"unix_epoch", _, nil}, ctx, [arg]}, query, params, root) do
     {[arg], query, params} = reduce_args([arg], query, params, root)
-    term = {:fragment, ctx, [
-      raw: "extract(epoch from ",
-      expr: arg,
-      raw: " at time zone 'utc' at time zone 'utc')"
-    ]}
+
+    term =
+      {:fragment, ctx,
+       [
+         raw: "extract(epoch from ",
+         expr: arg,
+         raw: " at time zone 'utc' at time zone 'utc')"
+       ]}
+
     {term, query, params}
   end
 
   @allowed_casts ~w[
     interval float text boolean numeric timestamp timestamptz date time timetz smallint integer bigint uuid
-  ] ++ Application.get_env(:abacus_sql, :allowed_casts, [])
-  def convert_ast({{cast, _, nil}, ctx, [arg]}, query, params, root) when cast in @allowed_casts do
+  ] ++ Application.compile_env(:abacus_sql, :allowed_casts, [])
+  def convert_ast({{cast, _, nil}, ctx, [arg]}, query, params, root)
+      when cast in @allowed_casts do
     {arg, query, params} = convert_ast(arg, query, params, root)
-    term = {:fragment, ctx, [
-      raw: "(",
-      expr: arg,
-      raw: ")::text::" <> cast,
-    ]}
+
+    term =
+      {:fragment, ctx,
+       [
+         raw: "(",
+         expr: arg,
+         raw: ")::text::" <> cast
+       ]}
+
     {term, query, params}
   end
 
   @binary_ops ~w[+ - * /]a
   def convert_ast({ops, ctx, args}, query, params, root) when ops in @binary_ops do
     {[lhs, rhs], query, params} = reduce_args(args, query, params, root)
-    term = {:fragment, ctx, [
-      raw: "(",
-      expr: lhs,
-      raw: to_string(ops),
-      expr: rhs,
-      raw: ")"
-    ]}
+
+    term =
+      {:fragment, ctx,
+       [
+         raw: "(",
+         expr: lhs,
+         raw: to_string(ops),
+         expr: rhs,
+         raw: ")"
+       ]}
+
     {term, query, params}
   end
 
   @bool_ops ~w[&& || not]a
   def convert_ast({ops, ctx, args}, query, params, root) when ops in @bool_ops do
     {args, query, params} = reduce_args(args, query, params, root)
-    ops = case ops do
-      :&& -> :and
-      :|| -> :or
-      :not -> :not
-    end
+
+    ops =
+      case ops do
+        :&& -> :and
+        :|| -> :or
+        :not -> :not
+      end
+
     term = {ops, ctx, args}
     {term, query, params}
   end
 
   def convert_ast({:if, ctx, [condition, do_block]}, query, params, root) do
     do_block = Keyword.put_new(do_block, :else, nil)
+
     args = [
       condition,
       Keyword.get(do_block, :do),
       Keyword.get(do_block, :else)
     ]
+
     {[condition, if_true, if_false], query, params} = reduce_args(args, query, params, root)
+
     ast = {
       :fragment,
       ctx,
@@ -164,6 +201,7 @@ defmodule AbacusSql.Term do
         raw: " END"
       ]
     }
+
     {ast, query, params}
   end
 
@@ -171,6 +209,7 @@ defmodule AbacusSql.Term do
     {_, query, params, root} = get_field(from, query, params, root)
     convert_ast({field, [], nil}, query, params, root)
   end
+
   def convert_ast({:., _, [from, expr]}, query, params, root) do
     {_, query, params, root} = get_field(from, query, params, root)
     {expr, query, params, _root} = get_field(expr, query, params, root)
@@ -185,9 +224,12 @@ defmodule AbacusSql.Term do
   end
 
   def convert_ast(nil, query, params, _root) do
-    term = {:fragment, [], [
-      raw: "NULL"
-    ]}
+    term =
+      {:fragment, [],
+       [
+         raw: "NULL"
+       ]}
+
     {term, query, params}
   end
 
@@ -198,26 +240,63 @@ defmodule AbacusSql.Term do
     {term, query, params}
   end
 
+  def convert_ast(list, query, params, root) when is_list(list) do
+    {args, query, params} = reduce_args(list, query, params, root)
+
+    fragment_args =
+      Enum.reduce(args, [raw: "jsonb_build_array("], fn
+        arg, [_] = acc ->
+          [{:expr, arg} | acc]
+
+        arg, acc ->
+          [{:expr, arg}, {:raw, ", "} | acc]
+      end)
+
+    term = {:fragment, [], Enum.reverse([{:raw, ")"} | fragment_args])}
+    {term, query, params}
+  end
+
+  def convert_ast({:"%{}", ctx, args}, query, params, root) do
+    list = Enum.flat_map(args, fn {key, value} -> [key, value] end)
+    {args, query, params} = reduce_args(list, query, params, root)
+    fragment_args =
+      Enum.reduce(args, [raw: "jsonb_build_object("], fn
+        arg, [_] = acc ->
+          [{:expr, arg} | acc]
+
+        arg, acc ->
+          [{:expr, arg}, {:raw, ", "} | acc]
+      end)
+
+    term = {:fragment, ctx, Enum.reverse([{:raw, ")"} | fragment_args])}
+    {term, query, params}
+  end
+
   # catch-all, don't write new convert_ast clauses below this
   def convert_ast(ast, query, params, root) do
     module = Application.get_env(:abacus_sql, :macro_module)
-    {res, finalize?} = case function_exported?(module, :convert_ast, 4) do
-      false ->
-        {nil, true}
-      true ->
-        try do
-          {ast, query, params} = apply(module, :convert_ast, [ast, query, params, root])
-          {{ast, query, params}, false}
-        rescue
-          e in [FunctionClauseError] ->
-            case e do
-              %{function: :convert_ast, arity: 4, module: ^module} ->
-                {nil, true}
-              _ ->
-                reraise e, __STACKTRACE__
-            end
-        end
-    end
+
+    {res, finalize?} =
+      case function_exported?(module, :convert_ast, 4) do
+        false ->
+          {nil, true}
+
+        true ->
+          try do
+            {ast, query, params} = apply(module, :convert_ast, [ast, query, params, root])
+            {{ast, query, params}, false}
+          rescue
+            e in [FunctionClauseError] ->
+              case e do
+                %{function: :convert_ast, arity: 4, module: ^module} ->
+                  {nil, true}
+
+                _ ->
+                  reraise e, __STACKTRACE__
+              end
+          end
+      end
+
     if finalize? do
       convert_ast_finalize(ast, query, params, root)
     else
@@ -229,12 +308,14 @@ defmodule AbacusSql.Term do
     raise AbacusSql.UndefinedFunctionError, function: fn_call, ctx: ctx, argc: length(args)
   end
 
-  @spec reduce_args(list(any), Ecto.Query.t, list, module) :: {list(any), Ecto.Query.t, list}
+  @spec reduce_args(list(any), Ecto.Query.t(), list, module) :: {list(any), Ecto.Query.t(), list}
   def reduce_args(args, query, params, root) do
-    {terms, {query, params}} = Enum.map_reduce(args, {query, params}, fn arg, {query, params} ->
-      {term, query, params} = convert_ast(arg, query, params, root)
-      {term, {query, params}}
-    end)
+    {terms, {query, params}} =
+      Enum.map_reduce(args, {query, params}, fn arg, {query, params} ->
+        {term, query, params} = convert_ast(arg, query, params, root)
+        {term, {query, params}}
+      end)
+
     {terms, query, params}
   end
 
@@ -244,64 +325,79 @@ defmodule AbacusSql.Term do
   # bb.meta_tags -> description
 
   def get_field(path, query, params, root)
+
   def get_field({:variable, name}, query, params, root) do
     get_field(name, query, params, root)
   end
+
   def get_field({:., _, [lhs, rhs]}, query, params, root) do
     {_, query, params, root} = get_field(lhs, query, params, root)
     get_field(rhs, query, params, root)
   end
+
   def get_field({field, _, nil}, query, params, root) when is_binary(field) do
     get_field(field, query, params, root)
   end
+
   def get_field(field, query, params, {root_field, :map}) do
-    {field, query, params} = case field do
-      field when is_binary(field) -> convert_ast(field, query, params, 0)
-      field when is_integer(field) -> {field, query, params}
-    end
-    term = {:fragment, [], [
-      raw: "",
-      expr: root_field,
-      raw: "->",
-      expr: field,
-      raw: ""
-    ]}
+    {field, query, params} =
+      case field do
+        field when is_binary(field) -> convert_ast(field, query, params, 0)
+        field when is_integer(field) -> {field, query, params}
+      end
+
+    term =
+      {:fragment, [],
+       [
+         raw: "",
+         expr: root_field,
+         raw: "->",
+         expr: field,
+         raw: ""
+       ]}
+
     {term, query, params, {term, :map}}
   end
+
   def get_field(field, query, params, root_id) when is_binary(field) do
     root = get_schema_by_id(query, root_id)
-    {query, term, root} = case {find_field(root, field), find_assoc(root, field), find_join(query, root_id, field)} do
-      {nil, nil, nil} ->
-        raise AbacusSql.NoFieldOrAssociationFoundError, name: field, in: root
 
-      {{field, type}, nil, nil} ->
-        term = {{:., [], [{:&, [], [root_id]}, field]}, [], []}
-        {query, term, {term, type}}
+    {query, term, root} =
+      case {find_field(root, field), find_assoc(root, field), find_join(query, root_id, field)} do
+        {nil, nil, nil} ->
+          raise AbacusSql.NoFieldOrAssociationFoundError, name: field, in: root
 
-      {nil, assoc, nil} when is_atom(assoc) ->
-        {query, tid} = auto_join(query, root_id, assoc)
-        {query, nil, tid}
+        {{field, type}, nil, nil} ->
+          term = {{:., [], [{:&, [], [root_id]}, field]}, [], []}
+          {query, term, {term, type}}
 
-      {nil, _, join} ->
-        {query, nil, join}
-    end
+        {nil, assoc, nil} when is_atom(assoc) ->
+          {query, tid} = auto_join(query, root_id, assoc)
+          {query, nil, tid}
+
+        {nil, _, join} ->
+          {query, nil, join}
+      end
 
     {term, query, params, root}
   end
 
   @spec find_join(Ecto.Query.t(), pos_integer(), binary()) :: nil | pos_integer()
   def find_join(query, root, field)
+
   def find_join(query, 0, field) do
     case Enum.find_index(query.joins, &(to_string(Map.get(&1, :as)) == field)) do
       nil -> nil
       index -> index + 1
     end
   end
+
   def find_join(_query, _root, _field) do
     nil
   end
 
-  @spec auto_join(Ecto.Query.t, origin_id :: integer, assoc :: atom) :: {Ecto.Query.t, table_id :: integer}
+  @spec auto_join(Ecto.Query.t(), origin_id :: integer, assoc :: atom) ::
+          {Ecto.Query.t(), table_id :: integer}
   def auto_join(query, origin_id, assoc) do
     join = %Ecto.Query.JoinExpr{
       assoc: {origin_id, assoc},
@@ -310,14 +406,16 @@ defmodule AbacusSql.Term do
       ix: nil,
       source: nil
     }
+
     case Enum.find_index(query.joins, fn
-      %{assoc: {^origin_id, ^assoc}, qual: :left} -> true
-      _ -> false
-    end) do
+           %{assoc: {^origin_id, ^assoc}, qual: :left} -> true
+           _ -> false
+         end) do
       nil ->
         tid = length(query.joins) + 1
         query = Map.update!(query, :joins, &(&1 ++ [join]))
         {query, tid}
+
       tid when is_integer(tid) ->
         {query, tid + 1}
     end
@@ -326,16 +424,21 @@ defmodule AbacusSql.Term do
   @spec find_field(atom, binary) :: {field :: atom, type :: atom} | nil
   def find_field(schema, name) do
     fields = schema.__schema__(:fields)
+
     case Enum.find(fields, &(to_string(&1) == name)) do
       nil ->
         nil
+
       field ->
         type = schema.__schema__(:type, field)
-        type = if function_exported?(type, :type, 0) do
-          type.type()
-        else
-          type
-        end
+
+        type =
+          if function_exported?(type, :type, 0) do
+            type.type()
+          else
+            type
+          end
+
         {field, type}
     end
   end
@@ -343,30 +446,33 @@ defmodule AbacusSql.Term do
   @spec find_assoc(atom, binary) :: assoc :: atom | nil
   def find_assoc(schema, name) do
     assocs = schema.__schema__(:associations)
+
     case Enum.find(assocs, &(to_string(&1) == name)) do
       nil -> nil
       assoc -> assoc
     end
   end
 
-  @spec get_root(Ecto.Query.t) :: module
+  @spec get_root(Ecto.Query.t()) :: module
   def get_root(%{from: %{source: %Ecto.SubQuery{query: query}}}) do
     get_root(query)
   end
+
   def get_root(%{from: %{source: {_, module}}}) when is_atom(module) do
     module
   end
 
-  @spec get_table_id(Ecto.Query.t, module) :: integer
+  @spec get_table_id(Ecto.Query.t(), module) :: integer
   def get_table_id(%{from: %{source: {_, module}}}, module) do
     0
   end
+
   def get_table_id(%{joins: joins} = query, module) do
     case Enum.find_index(joins, &(get_join_source(query, &1) == module)) do
       nil ->
         case query do
           %{from: %{source: %Ecto.SubQuery{query: query}}} -> get_table_id(query, module)
-          _ ->  raise RuntimeError, "table_id for #{module} could not be found"
+          _ -> raise RuntimeError, "table_id for #{module} could not be found"
         end
 
       int when is_integer(int) ->
@@ -374,13 +480,15 @@ defmodule AbacusSql.Term do
     end
   end
 
-  @spec get_schema_by_id(Ecto.Query.t, integer) :: module
+  @spec get_schema_by_id(Ecto.Query.t(), integer) :: module
   def get_schema_by_id(%{from: %{source: {_, schema}}}, 0) when is_atom(schema) do
     schema
   end
+
   def get_schema_by_id(%{from: %{source: %Ecto.SubQuery{query: query}}}, 0) do
     get_schema_by_id(query, 0)
   end
+
   def get_schema_by_id(%{joins: joins} = query, id) when is_integer(id) do
     join = Enum.at(joins, id - 1)
     get_join_source(query, join)
@@ -390,14 +498,19 @@ defmodule AbacusSql.Term do
     case join do
       %{source: {_, schema}} when is_atom(schema) ->
         schema
+
       %{assoc: {origin_id, assoc}} ->
         origin_schema = get_schema_by_id(query, origin_id)
+
         origin_schema.__schema__(:association, assoc)
         |> Map.get(:queryable)
+
       %{source: %Ecto.SubQuery{query: subquery}} ->
         get_join_source(query, subquery)
+
       %{from: %{source: {_, schema}}} when is_atom(schema) ->
         schema
+
       _ ->
         nil
     end
@@ -416,12 +529,14 @@ defmodule AbacusSql.Term do
     end
   end
 
-  @spec parse(AbacusSql.t) :: {:ok, tuple}
+  @spec parse(AbacusSql.t()) :: {:ok, tuple}
   def parse(ast) when is_tuple(ast) do
     ast
   end
+
   def parse(bin) do
     Process.put(:variables, %{})
+
     with bin <- to_string(bin),
          bin <- String.to_charlist(bin),
          {:ok, tokens, _} <- :math_term.string(bin),
@@ -443,7 +558,9 @@ defmodule AbacusSql.Term do
           nil -> {atom, ctx, nil}
           s -> {s, ctx, nil}
         end
-      o -> o
+
+      o ->
+        o
     end)
   end
 
@@ -456,17 +573,24 @@ defmodule AbacusSql.Term do
     case args do
       [inner, {:variable, var_access}] ->
         {:., ctx, [inner, var_access]}
+
       [inner, {:variable, var_access} | rest] ->
-        {:., ctx, [
-          {:., [], [
-            inner,
-            var_access
-          ]} | rest
-        ]} |> _comb_variable_access()
+        {:., ctx,
+         [
+           {:., [],
+            [
+              inner,
+              var_access
+            ]}
+           | rest
+         ]}
+        |> _comb_variable_access()
+
       [_, _] ->
         ast
     end
   end
+
   def _comb_variable_access(ast) do
     ast
   end

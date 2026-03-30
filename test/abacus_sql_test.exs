@@ -185,6 +185,45 @@ defmodule AbacusSqlTest do
     assert inspect(expected_query) == inspect(query)
   end
 
+  describe "jsonb functionality" do
+    test "list literals are wrapped in jsonb_build_array" do
+      query =
+        from(u in User)
+        |> AbacusSql.select("json", "[id, name]")
+
+      expected_query =
+        from(u in User,
+          select: %{
+            "json" => fragment("jsonb_build_array(?, ?)", u.id, u.name)
+          }
+        )
+
+      assert inspect(expected_query) == inspect(query)
+    end
+
+    test "object literals are wrapped in jsonb_build_object" do
+      query =
+        from(u in User)
+        |> AbacusSql.select("json", "{user_name: name, field_13: 5}")
+
+      expected_query =
+        from(u in User,
+          select: %{
+            "json" =>
+              fragment(
+                "jsonb_build_object(?, ?, ?, ?)",
+                type(^"user_name", :string),
+                u.name,
+                type(^"field_13", :string),
+                type(^5, :integer)
+              )
+          }
+        )
+
+      assert inspect(expected_query) == inspect(query)
+    end
+  end
+
   test "different root" do
     query = from(u in User, join: p in assoc(u, :blog_posts), as: :posts)
 
