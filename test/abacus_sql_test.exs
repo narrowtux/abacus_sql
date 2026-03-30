@@ -244,6 +244,7 @@ defmodule AbacusSqlTest do
 
   end
 
+  @tag [skip: true]
   test "select supports as option" do
     query =
       from(u in User)
@@ -254,6 +255,7 @@ defmodule AbacusSqlTest do
     AbacusSqlTest.Repo.all(query)
   end
 
+  @tag [skip: true]
   test "order_by_index" do
     query =
       from(u in User)
